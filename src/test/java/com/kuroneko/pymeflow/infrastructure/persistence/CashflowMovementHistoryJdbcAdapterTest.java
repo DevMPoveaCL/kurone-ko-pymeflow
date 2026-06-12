@@ -1,0 +1,162 @@
+package com.kuroneko.pymeflow.infrastructure.persistence;
+
+import com.kuroneko.pymeflow.application.cashflow.CashflowMovementDraft;
+import com.kuroneko.pymeflow.application.cashflow.CashflowMovementStatus;
+import com.kuroneko.pymeflow.application.cashflow.ManualReviewMovementResolutionCommand;
+import com.kuroneko.pymeflow.domain.vertical.ProfileId;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.test.autoconfigure.jdbc.JdbcTest;
+import org.springframework.boot.test.autoconfigure.jdbc.AutoConfigureTestDatabase;
+import org.springframework.core.io.ClassPathResource;
+import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.jdbc.datasource.init.ScriptUtils;
+
+import javax.sql.DataSource;
+import java.math.BigDecimal;
+import java.sql.Connection;
+import java.time.LocalDate;
+import java.util.Currency;
+import java.util.List;
+
+import static org.assertj.core.api.Assertions.assertThat;
+
+@JdbcTest(properties = {
+        "spring.flyway.enabled=false",
+        "spring.datasource.url=jdbc:h2:mem:cashflow-history;MODE=PostgreSQL;DATABASE_TO_LOWER=TRUE;DB_CLOSE_DELAY=-1"
+})
+@AutoConfigureTestDatabase(replace = AutoConfigureTestDatabase.Replace.NONE)
+class CashflowMovementHistoryJdbcAdapterTest {
+
+    private static final ProfileId PROFILE_ID = new ProfileId("test-retail-cl");
+
+    @Autowired
+    private DataSource dataSource;
+
+    @Autowired
+    private JdbcTemplate jdbcTemplate;
+
+    private CashflowMovementHistoryJdbcAdapter adapter;
+
+    @BeforeEach
+    void setUp() throws Exception {
+        adapter = new CashflowMovementHistoryJdbcAdapter(jdbcTemplate);
+        jdbcTemplate.execute("create table if not exists vertical_profiles (id varchar(63) primary key, display_name varchar(120) not null, enabled boolean not null, created_at timestamp with time zone not null default now())");
+        jdbcTemplate.execute("create table if not exists vertical_profile_categories (profile_id varchar(63) not null references vertical_profiles(id), category_key varchar(80) not null, display_name varchar(120) not null, direction varchar(20) not null, sort_order integer not null, primary key (profile_id, category_key))");
+        jdbcTemplate.execute("create table if not exists vertical_profile_rules (profile_id varchar(63) not null references vertical_profiles(id), rule_key varchar(100) not null, condition_key varchar(120) not null, threshold numeric(18, 2) not null, action_key varchar(100) not null, primary key (profile_id, rule_key))");
+        jdbcTemplate.execute("create table if not exists vertical_profile_obligation_templates (profile_id varchar(63) not null references vertical_profiles(id), obligation_key varchar(100) not null, display_name varchar(120) not null, estimated_amount numeric(18, 2) not null, frequency varchar(20) not null, due_day_of_month integer not null, primary key (profile_id, obligation_key))");
+        try (Connection connection = dataSource.getConnection()) {
+            ScriptUtils.executeSqlScript(connection, new ClassPathResource("db/migration/V2__create_cashflow_movement_history.sql"));
+        }
+        jdbcTemplate.update("delete from cashflow_movement_history");
+        jdbcTemplate.update("delete from vertical_profile_categories");
+        jdbcTemplate.update("delete from vertical_profile_rules");
+        jdbcTemplate.update("delete from vertical_profile_obligation_templates");
+        jdbcTemplate.update("delete from vertical_profiles");
+        jdbcTemplate.update("insert into vertical_profiles (id, display_name, enabled) values (?, ?, true)", PROFILE_ID.value(), "Comercio prueba");
+        jdbcTemplate.update("insert into vertical_profile_categories (profile_id, category_key, display_name, direction, sort_order) values (?, ?, ?, ?, ?)", PROFILE_ID.value(), "sales", "Ventas", "INFLOW", 10);
+        jdbcTemplate.update("insert into vertical_profile_categories (profile_id, category_key, display_name, direction, sort_order) values (?, ?, ?, ?, ?)", PROFILE_ID.value(), "supplies", "Insumos", "OUTFLOW", 20);
+    }
+
+    @Test
+    void savesAndReadsMovementByIdWithNullableSafeFields() {
+        var saved = adapter.saveAll(List.of(manualReview(null, null))).getFirst();
+
+        var found = adapter.findById(saved.id());
+
+        assertThat(found).isPresent();
+        assertThat(found.orElseThrow().safeDescription()).isNull();
+        assertThat(found.orElseThrow().sourceReference()).isNull();
+        assertThat(found.orElseThrow().status()).isEqualTo(CashflowMovementStatus.MANUAL_REVIEW);
+    }
+
+    @Test
+    void listsOnlyPendingManualReviewsForProfile() {
+        var otherProfile = new ProfileId("other-retail-cl");
+        jdbcTemplate.update("insert into vertical_profiles (id, display_name, enabled) values (?, ?, true)", otherProfile.value(), "Otro comercio");
+        adapter.saveAll(List.of(
+                manualReview("Venta Caja 1", "batch-001"),
+                projectable("sales"),
+                new CashflowMovementDraft(otherProfile, BigDecimal.valueOf(1500), Currency.getInstance("CLP"), LocalDate.of(2026, 6, 3), CashflowMovementStatus.MANUAL_REVIEW, null, "Venta Caja 2", null, null)
+        ));
+
+        var pending = adapter.findPendingManualReviews(PROFILE_ID);
+
+        assertThat(pending).hasSize(1);
+        assertThat(pending.getFirst().safeDescription()).isEqualTo("Venta Caja 1");
+        assertThat(pending.getFirst().status()).isEqualTo(CashflowMovementStatus.MANUAL_REVIEW);
+    }
+
+    @Test
+    void listsOnlyProjectionReadyMovementsForProfile() {
+        adapter.saveAll(List.of(
+                manualReview("Venta Caja 1", null),
+                projectable("sales"),
+                rejected("policy-blocked")
+        ));
+
+        var projectionReady = adapter.findProjectionReady(PROFILE_ID);
+
+        assertThat(projectionReady).hasSize(1);
+        assertThat(projectionReady.getFirst().categoryKey()).isEqualTo("sales");
+        assertThat(projectionReady.getFirst().status()).isEqualTo(CashflowMovementStatus.PROJECTABLE);
+    }
+
+    @Test
+    void resolvesPendingManualReviewWithAtomicStatusTransition() {
+        var movement = adapter.saveAll(List.of(manualReview("Venta Caja 1", null))).getFirst();
+
+        var resolved = adapter.resolveManualReview(new ManualReviewMovementResolutionCommand(movement.id(), PROFILE_ID, "sales"));
+        var repeated = adapter.resolveManualReview(new ManualReviewMovementResolutionCommand(movement.id(), PROFILE_ID, "supplies"));
+
+        assertThat(resolved).isPresent();
+        assertThat(resolved.orElseThrow().status()).isEqualTo(CashflowMovementStatus.PROJECTABLE);
+        assertThat(resolved.orElseThrow().categoryKey()).isEqualTo("sales");
+        assertThat(resolved.orElseThrow().resolvedAt()).isNotNull();
+        assertThat(repeated).isEmpty();
+        assertThat(adapter.findById(movement.id()).orElseThrow().categoryKey()).isEqualTo("sales");
+    }
+
+    private static CashflowMovementDraft manualReview(String safeDescription, String sourceReference) {
+        return new CashflowMovementDraft(
+                PROFILE_ID,
+                BigDecimal.valueOf(1200),
+                Currency.getInstance("CLP"),
+                LocalDate.of(2026, 6, 1),
+                CashflowMovementStatus.MANUAL_REVIEW,
+                null,
+                safeDescription,
+                sourceReference,
+                null
+        );
+    }
+
+    private static CashflowMovementDraft projectable(String categoryKey) {
+        return new CashflowMovementDraft(
+                PROFILE_ID,
+                BigDecimal.valueOf(2500),
+                Currency.getInstance("CLP"),
+                LocalDate.of(2026, 6, 2),
+                CashflowMovementStatus.PROJECTABLE,
+                categoryKey,
+                "Venta Caja 1",
+                "batch-002",
+                null
+        );
+    }
+
+    private static CashflowMovementDraft rejected(String reasonCode) {
+        return new CashflowMovementDraft(
+                PROFILE_ID,
+                BigDecimal.valueOf(900),
+                Currency.getInstance("CLP"),
+                LocalDate.of(2026, 6, 3),
+                CashflowMovementStatus.REJECTED,
+                null,
+                null,
+                null,
+                reasonCode
+        );
+    }
+}
