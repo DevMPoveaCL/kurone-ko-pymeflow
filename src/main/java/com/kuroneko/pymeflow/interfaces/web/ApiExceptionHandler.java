@@ -66,6 +66,9 @@ public class ApiExceptionHandler {
         if (message.contains("información sensible")) {
             return "La información enviada contiene datos sensibles y no puede proyectarse.";
         }
+        if (message.contains("fecha final no puede ser anterior")) {
+            return "La fecha final no puede ser anterior a la fecha inicial.";
+        }
         if (message.contains("movimiento rechazado") || message.contains("revisión manual") || message.contains("listo para proyección") || message.contains("estado de salida")) {
             return "Solo se pueden resolver movimientos en revisión manual hacia un resultado listo para proyección.";
         }

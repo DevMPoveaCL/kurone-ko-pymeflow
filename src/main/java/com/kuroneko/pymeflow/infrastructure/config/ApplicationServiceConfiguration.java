@@ -3,6 +3,7 @@ package com.kuroneko.pymeflow.infrastructure.config;
 import com.kuroneko.pymeflow.application.port.out.AccountantExportPort;
 import com.kuroneko.pymeflow.application.export.AccountantExportService;
 import com.kuroneko.pymeflow.application.cashflow.CashflowProjectionService;
+import com.kuroneko.pymeflow.application.cashflow.CashflowMovementHistoryService;
 import com.kuroneko.pymeflow.application.cashflow.ManualReviewResolutionService;
 import com.kuroneko.pymeflow.application.cashflow.PharmacyCashflowService;
 import com.kuroneko.pymeflow.application.cashflow.SensitiveDataPolicy;
@@ -48,6 +49,14 @@ public class ApplicationServiceConfiguration {
     @Bean
     CashflowProjectionService cashflowProjectionService(VerticalProfileService verticalProfileService) {
         return new CashflowProjectionService(verticalProfileService);
+    }
+
+    @Bean
+    CashflowMovementHistoryService cashflowMovementHistoryService(
+            VerticalProfileService verticalProfileService,
+            CashflowMovementHistoryPort cashflowMovementHistoryPort
+    ) {
+        return new CashflowMovementHistoryService(verticalProfileService, cashflowMovementHistoryPort);
     }
 
     @Bean
