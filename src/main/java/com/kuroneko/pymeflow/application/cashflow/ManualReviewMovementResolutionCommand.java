@@ -7,8 +7,14 @@ import java.util.UUID;
 public record ManualReviewMovementResolutionCommand(
         UUID movementId,
         ProfileId profileId,
-        String categoryKey
+        String categoryKey,
+        String description,
+        String sourceReference
 ) {
+    public ManualReviewMovementResolutionCommand(UUID movementId, ProfileId profileId, String categoryKey) {
+        this(movementId, profileId, categoryKey, null, null);
+    }
+
     public ManualReviewMovementResolutionCommand {
         if (movementId == null) {
             throw new IllegalArgumentException("Movement id is required");
@@ -23,5 +29,21 @@ public record ManualReviewMovementResolutionCommand(
         if (categoryKey.length() > 80) {
             throw new IllegalArgumentException("Category key is too long");
         }
+        description = normalizeOptional(description, 160, "Description is too long");
+        sourceReference = normalizeOptional(sourceReference, 80, "Source reference is too long");
+    }
+
+    private static String normalizeOptional(String value, int maxLength, String message) {
+        if (value == null) {
+            return null;
+        }
+        var normalized = value.trim();
+        if (normalized.isBlank()) {
+            return null;
+        }
+        if (normalized.length() > maxLength) {
+            throw new IllegalArgumentException(message);
+        }
+        return normalized;
     }
 }

@@ -1,8 +1,12 @@
 package com.kuroneko.pymeflow.interfaces.web;
 
+import com.kuroneko.pymeflow.application.cashflow.CashflowMovementHistoryService;
 import com.kuroneko.pymeflow.application.cashflow.ManualReviewResolutionCommand;
+import com.kuroneko.pymeflow.application.cashflow.ManualReviewMovementResolutionCommand;
 import com.kuroneko.pymeflow.application.cashflow.ManualReviewResolutionResult;
 import com.kuroneko.pymeflow.application.cashflow.ManualReviewResolutionService;
+import com.kuroneko.pymeflow.application.cashflow.PersistedManualReviewResolutionResult;
+import com.kuroneko.pymeflow.application.cashflow.ProjectionReadyCashflowTransaction;
 import com.kuroneko.pymeflow.application.cashflow.ProjectedCashflowTransaction;
 import com.kuroneko.pymeflow.domain.vertical.CashflowCategory;
 import com.kuroneko.pymeflow.domain.vertical.ProfileId;
@@ -17,6 +21,7 @@ import jakarta.validation.constraints.Positive;
 import jakarta.validation.constraints.Size;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
@@ -26,6 +31,7 @@ import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.Currency;
 import java.util.Optional;
+import java.util.UUID;
 
 @RestController
 @RequestMapping("/api/cashflow/manual-review/resolutions")
@@ -36,9 +42,14 @@ public class ManualReviewResolutionController {
     private static final String CATEGORIZED = ManualReviewResolutionService.STATUS_CATEGORIZED;
 
     private final ManualReviewResolutionService manualReviewResolutionService;
+    private final CashflowMovementHistoryService cashflowMovementHistoryService;
 
-    public ManualReviewResolutionController(ManualReviewResolutionService manualReviewResolutionService) {
+    public ManualReviewResolutionController(
+            ManualReviewResolutionService manualReviewResolutionService,
+            CashflowMovementHistoryService cashflowMovementHistoryService
+    ) {
         this.manualReviewResolutionService = manualReviewResolutionService;
+        this.cashflowMovementHistoryService = cashflowMovementHistoryService;
     }
 
     @PostMapping
@@ -52,6 +63,20 @@ public class ManualReviewResolutionController {
         validateInterfaceRules(request);
         return ResponseEntity.ok(ManualReviewResolutionResponse.from(
                 manualReviewResolutionService.resolve(request.toCommand())
+        ));
+    }
+
+    @PostMapping("/{movementId}")
+    @Operation(
+            summary = "Resolver movimiento histórico por identificador",
+            description = "Convierte una revisión manual persistida en una transacción lista para proyección, sin persistir resultados de proyección."
+    )
+    public ResponseEntity<PersistedManualReviewResolutionResponse> resolvePersisted(
+            @PathVariable UUID movementId,
+            @Valid @RequestBody PersistedManualReviewResolutionRequest request
+    ) {
+        return ResponseEntity.ok(PersistedManualReviewResolutionResponse.from(
+                cashflowMovementHistoryService.resolveManualReview(request.toCommand(movementId))
         ));
     }
 
@@ -159,6 +184,70 @@ public class ManualReviewResolutionController {
                     CategoryResponse.from(result.category()),
                     result.safeDescription().orElse(null),
                     result.safeSourceReference().orElse(null)
+            );
+        }
+    }
+
+    public record PersistedManualReviewResolutionRequest(
+            @NotBlank(message = "El perfil es obligatorio.")
+            @Schema(example = "pharmacy-cl")
+            String profileId,
+
+            @NotBlank(message = "La categoría seleccionada es obligatoria.")
+            @Schema(example = "sales")
+            String chosenCategoryKey,
+
+            @Size(max = 160, message = "La descripción no puede superar 160 caracteres.")
+            @Schema(description = "Descripción opcional no sensible para validar contexto de caja.", example = "Venta Caja 1")
+            String description,
+
+            @Size(max = 80, message = "La referencia de origen no puede superar 80 caracteres.")
+            @Schema(description = "Referencia opcional no sensible del origen.", example = "caja-1")
+            String sourceReference
+    ) {
+        ManualReviewMovementResolutionCommand toCommand(UUID movementId) {
+            return new ManualReviewMovementResolutionCommand(
+                    movementId,
+                    new ProfileId(profileId),
+                    chosenCategoryKey,
+                    description,
+                    sourceReference
+            );
+        }
+    }
+
+    public record PersistedManualReviewResolutionResponse(
+            ProjectionReadyTransactionResponse transaction,
+            CategoryResponse category,
+            String description,
+            String sourceReference
+    ) {
+        static PersistedManualReviewResolutionResponse from(PersistedManualReviewResolutionResult result) {
+            return new PersistedManualReviewResolutionResponse(
+                    ProjectionReadyTransactionResponse.from(result.transaction()),
+                    CategoryResponse.from(result.category()),
+                    result.safeDescription().orElse(null),
+                    result.safeSourceReference().orElse(null)
+            );
+        }
+    }
+
+    public record ProjectionReadyTransactionResponse(
+            UUID movementId,
+            String categoryKey,
+            BigDecimal amount,
+            String currency,
+            LocalDate date,
+            String status
+    ) {
+        static ProjectionReadyTransactionResponse from(ProjectionReadyCashflowTransaction transaction) {
+            return new ProjectionReadyTransactionResponse(
+                    transaction.movementId(),
+                    transaction.categoryKey(),
+                    transaction.amount(),
+                    transaction.currency().getCurrencyCode(),
+                    transaction.date(),
+                    transaction.status().name()
             );
         }
     }

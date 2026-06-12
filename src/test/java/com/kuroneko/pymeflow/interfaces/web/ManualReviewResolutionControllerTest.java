@@ -1,7 +1,11 @@
 package com.kuroneko.pymeflow.interfaces.web;
 
+import com.kuroneko.pymeflow.application.cashflow.CashflowMovementHistoryService;
+import com.kuroneko.pymeflow.application.cashflow.CashflowMovementStatus;
 import com.kuroneko.pymeflow.application.cashflow.ManualReviewResolutionResult;
 import com.kuroneko.pymeflow.application.cashflow.ManualReviewResolutionService;
+import com.kuroneko.pymeflow.application.cashflow.PersistedManualReviewResolutionResult;
+import com.kuroneko.pymeflow.application.cashflow.ProjectionReadyCashflowTransaction;
 import com.kuroneko.pymeflow.application.cashflow.ProjectedCashflowTransaction;
 import com.kuroneko.pymeflow.domain.vertical.CashflowCategory;
 import com.kuroneko.pymeflow.domain.vertical.CashflowDirection;
@@ -16,6 +20,7 @@ import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.Currency;
 import java.util.Optional;
+import java.util.UUID;
 
 import static org.hamcrest.Matchers.containsString;
 import static org.hamcrest.Matchers.not;
@@ -34,6 +39,9 @@ class ManualReviewResolutionControllerTest {
 
     @MockBean
     private ManualReviewResolutionService manualReviewResolutionService;
+
+    @MockBean
+    private CashflowMovementHistoryService cashflowMovementHistoryService;
 
     @Autowired
     private MockMvc mockMvc;
@@ -176,6 +184,70 @@ class ManualReviewResolutionControllerTest {
                 .andExpect(jsonPath("$.sourceReference").doesNotExist());
     }
 
+    @Test
+    void resolvesPersistedManualReviewMovementById() throws Exception {
+        var movementId = UUID.randomUUID();
+        when(cashflowMovementHistoryService.resolveManualReview(any())).thenReturn(persistedResult(
+                movementId,
+                Optional.of("Venta Caja 1"),
+                Optional.of("caja-1")
+        ));
+
+        mockMvc.perform(post("/api/cashflow/manual-review/resolutions/{movementId}", movementId)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(persistedPayload()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.transaction.movementId").value(movementId.toString()))
+                .andExpect(jsonPath("$.transaction.categoryKey").value("sales"))
+                .andExpect(jsonPath("$.transaction.amount").value(125000))
+                .andExpect(jsonPath("$.transaction.currency").value("CLP"))
+                .andExpect(jsonPath("$.transaction.date").value("2026-06-11"))
+                .andExpect(jsonPath("$.transaction.status").value("PROJECTABLE"))
+                .andExpect(jsonPath("$.category.key").value("sales"))
+                .andExpect(jsonPath("$.description").value("Venta Caja 1"))
+                .andExpect(jsonPath("$.sourceReference").value("caja-1"));
+
+        verify(cashflowMovementHistoryService).resolveManualReview(any());
+    }
+
+    @Test
+    void mapsPersistedResolutionFailuresToNeutralSpanishErrors() throws Exception {
+        var movementId = UUID.randomUUID();
+        when(cashflowMovementHistoryService.resolveManualReview(any()))
+                .thenThrow(new IllegalArgumentException("No se encontró el movimiento solicitado."));
+
+        mockMvc.perform(post("/api/cashflow/manual-review/resolutions/{movementId}", movementId)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(persistedPayload()))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.message").value("No se encontró el movimiento solicitado."));
+
+        reset(cashflowMovementHistoryService);
+        when(cashflowMovementHistoryService.resolveManualReview(any()))
+                .thenThrow(new IllegalArgumentException("El movimiento ya fue resuelto o no está disponible para revisión manual."));
+
+        mockMvc.perform(post("/api/cashflow/manual-review/resolutions/{movementId}", movementId)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(persistedPayload()))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.message").value("El movimiento ya fue resuelto o no está disponible para revisión manual."));
+    }
+
+    @Test
+    void rejectsSensitivePersistedResolutionInputWithoutEchoingRequestText() throws Exception {
+        var sensitiveDescription = "Venta Caja 1 receta 12345";
+        when(cashflowMovementHistoryService.resolveManualReview(any()))
+                .thenThrow(new IllegalArgumentException("La información enviada contiene datos sensibles y no puede proyectarse."));
+
+        mockMvc.perform(post("/api/cashflow/manual-review/resolutions/{movementId}", UUID.randomUUID())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(persistedPayload().replace("Venta Caja 1", sensitiveDescription)))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.message").value("La información enviada contiene datos sensibles y no puede proyectarse."))
+                .andExpect(content().string(not(containsString(sensitiveDescription))))
+                .andExpect(content().string(not(containsString("receta 12345"))));
+    }
+
     private static ManualReviewResolutionResult result(
             String outputStatus,
             Optional<String> description,
@@ -192,6 +264,26 @@ class ManualReviewResolutionControllerTest {
                 description,
                 sourceReference,
                 outputStatus
+        );
+    }
+
+    private static PersistedManualReviewResolutionResult persistedResult(
+            UUID movementId,
+            Optional<String> description,
+            Optional<String> sourceReference
+    ) {
+        return new PersistedManualReviewResolutionResult(
+                new ProjectionReadyCashflowTransaction(
+                        movementId,
+                        "sales",
+                        BigDecimal.valueOf(125000),
+                        Currency.getInstance("CLP"),
+                        LocalDate.of(2026, 6, 11),
+                        CashflowMovementStatus.PROJECTABLE
+                ),
+                new CashflowCategory("sales", "Ventas", CashflowDirection.INFLOW),
+                description,
+                sourceReference
         );
     }
 
@@ -221,6 +313,17 @@ class ManualReviewResolutionControllerTest {
                   "date": "2026-06-11",
                   "sourceStatus": "MANUAL_REVIEW",
                   "status": "CATEGORIZED"
+                }
+                """;
+    }
+
+    private static String persistedPayload() {
+        return """
+                {
+                  "profileId": "pharmacy-cl",
+                  "chosenCategoryKey": "sales",
+                  "description": "Venta Caja 1",
+                  "sourceReference": "caja-1"
                 }
                 """;
     }

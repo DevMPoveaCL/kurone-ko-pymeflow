@@ -63,11 +63,17 @@ public class ApiExceptionHandler {
         if (message.contains("categoría seleccionada no existe")) {
             return "La categoría enviada no está configurada para el perfil.";
         }
-        if (message.contains("información sensible")) {
+        if (message.contains("información sensible") || message.contains("datos sensibles")) {
             return "La información enviada contiene datos sensibles y no puede proyectarse.";
         }
         if (message.contains("fecha final no puede ser anterior")) {
             return "La fecha final no puede ser anterior a la fecha inicial.";
+        }
+        if (message.contains("No se encontró el movimiento solicitado")) {
+            return "No se encontró el movimiento solicitado.";
+        }
+        if (message.contains("movimiento ya fue resuelto") || message.contains("no está disponible para revisión manual")) {
+            return "El movimiento ya fue resuelto o no está disponible para revisión manual.";
         }
         if (message.contains("movimiento rechazado") || message.contains("revisión manual") || message.contains("listo para proyección") || message.contains("estado de salida")) {
             return "Solo se pueden resolver movimientos en revisión manual hacia un resultado listo para proyección.";

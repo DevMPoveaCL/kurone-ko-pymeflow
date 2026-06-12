@@ -54,9 +54,10 @@ public class ApplicationServiceConfiguration {
     @Bean
     CashflowMovementHistoryService cashflowMovementHistoryService(
             VerticalProfileService verticalProfileService,
-            CashflowMovementHistoryPort cashflowMovementHistoryPort
+            CashflowMovementHistoryPort cashflowMovementHistoryPort,
+            SensitiveDataPolicy sensitiveDataPolicy
     ) {
-        return new CashflowMovementHistoryService(verticalProfileService, cashflowMovementHistoryPort);
+        return new CashflowMovementHistoryService(verticalProfileService, cashflowMovementHistoryPort, sensitiveDataPolicy);
     }
 
     @Bean

@@ -10,13 +10,23 @@ import java.util.List;
 public final class CashflowMovementHistoryService {
     private final VerticalProfileService verticalProfileService;
     private final CashflowMovementHistoryPort cashflowMovementHistoryPort;
+    private final SensitiveDataPolicy sensitiveDataPolicy;
 
     public CashflowMovementHistoryService(
             VerticalProfileService verticalProfileService,
             CashflowMovementHistoryPort cashflowMovementHistoryPort
     ) {
+        this(verticalProfileService, cashflowMovementHistoryPort, new SensitiveDataPolicy(List.of()));
+    }
+
+    public CashflowMovementHistoryService(
+            VerticalProfileService verticalProfileService,
+            CashflowMovementHistoryPort cashflowMovementHistoryPort,
+            SensitiveDataPolicy sensitiveDataPolicy
+    ) {
         this.verticalProfileService = verticalProfileService;
         this.cashflowMovementHistoryPort = cashflowMovementHistoryPort;
+        this.sensitiveDataPolicy = sensitiveDataPolicy;
     }
 
     public List<PendingManualReviewMovement> pendingManualReviews(ProfileId profileId) {
@@ -44,14 +54,50 @@ public final class CashflowMovementHistoryService {
                 .toList();
     }
 
-    private void requireProfile(ProfileId profileId) {
+    public PersistedManualReviewResolutionResult resolveManualReview(ManualReviewMovementResolutionCommand command) {
+        if (command == null) {
+            throw new IllegalArgumentException("La solicitud de resolución es obligatoria.");
+        }
+        var profile = requireProfile(command.profileId());
+        validateSafeText(command.description());
+        validateSafeText(command.sourceReference());
+        var category = profile.categories().stream()
+                .filter(candidate -> candidate.key().equals(command.categoryKey()))
+                .findFirst()
+                .orElseThrow(() -> new IllegalArgumentException("La categoría enviada no está configurada para el perfil."));
+        var movement = cashflowMovementHistoryPort.findById(command.movementId())
+                .orElseThrow(() -> new IllegalArgumentException("No se encontró el movimiento solicitado."));
+        if (!movement.profileId().equals(command.profileId())) {
+            throw new IllegalArgumentException("No se encontró el movimiento solicitado.");
+        }
+        if (movement.status() != CashflowMovementStatus.MANUAL_REVIEW) {
+            throw new IllegalArgumentException("El movimiento ya fue resuelto o no está disponible para revisión manual.");
+        }
+
+        var resolved = cashflowMovementHistoryPort.resolveManualReview(command)
+                .orElseThrow(() -> new IllegalArgumentException("El movimiento ya fue resuelto o no está disponible para revisión manual."));
+        return new PersistedManualReviewResolutionResult(
+                ProjectionReadyCashflowTransaction.from(resolved),
+                category,
+                resolved.safeDescriptionOptional(),
+                resolved.sourceReferenceOptional()
+        );
+    }
+
+    private com.kuroneko.pymeflow.domain.vertical.VerticalProfile requireProfile(ProfileId profileId) {
         if (profileId == null) {
             throw new IllegalArgumentException("El perfil es obligatorio.");
         }
         try {
-            verticalProfileService.loadProfile(profileId);
+            return verticalProfileService.loadProfile(profileId);
         } catch (IllegalArgumentException exception) {
             throw new IllegalArgumentException("El perfil indicado no está configurado.", exception);
+        }
+    }
+
+    private void validateSafeText(String text) {
+        if (sensitiveDataPolicy.rejectsText(text)) {
+            throw new IllegalArgumentException("La información enviada contiene datos sensibles y no puede proyectarse.");
         }
     }
 }

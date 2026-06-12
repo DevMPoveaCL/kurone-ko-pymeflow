@@ -118,6 +118,23 @@ class CashflowMovementHistoryJdbcAdapterTest {
         assertThat(adapter.findById(movement.id()).orElseThrow().categoryKey()).isEqualTo("sales");
     }
 
+    @Test
+    void rejectedMovementCannotBeResolvedAndResolvedMovementBecomesProjectionReady() {
+        var rejected = adapter.saveAll(List.of(rejected("policy-blocked"))).getFirst();
+        var manualReview = adapter.saveAll(List.of(manualReview("Venta Caja 1", "caja-1"))).getFirst();
+
+        var rejectedResolution = adapter.resolveManualReview(new ManualReviewMovementResolutionCommand(rejected.id(), PROFILE_ID, "sales"));
+        var resolved = adapter.resolveManualReview(new ManualReviewMovementResolutionCommand(manualReview.id(), PROFILE_ID, "sales"));
+
+        assertThat(rejectedResolution).isEmpty();
+        assertThat(adapter.findById(rejected.id()).orElseThrow().status()).isEqualTo(CashflowMovementStatus.REJECTED);
+        assertThat(resolved).isPresent();
+        assertThat(adapter.findProjectionReady(PROFILE_ID))
+                .extracting(record -> record.id())
+                .contains(manualReview.id())
+                .doesNotContain(rejected.id());
+    }
+
     private static CashflowMovementDraft manualReview(String safeDescription, String sourceReference) {
         return new CashflowMovementDraft(
                 PROFILE_ID,
