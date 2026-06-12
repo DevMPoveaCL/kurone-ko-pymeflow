@@ -6,7 +6,8 @@ import com.kuroneko.pymeflow.application.cashflow.CashflowMovementStatus;
 import com.kuroneko.pymeflow.application.cashflow.ManualReviewMovementResolutionCommand;
 import com.kuroneko.pymeflow.application.port.out.CashflowMovementHistoryPort;
 import com.kuroneko.pymeflow.domain.vertical.ProfileId;
-import org.springframework.boot.autoconfigure.condition.ConditionalOnBean;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Repository;
 
@@ -20,7 +21,6 @@ import java.util.Optional;
 import java.util.UUID;
 
 @Repository
-@ConditionalOnBean(JdbcTemplate.class)
 public class CashflowMovementHistoryJdbcAdapter implements CashflowMovementHistoryPort {
     private static final String SELECT_COLUMNS = """
             select id, profile_id, amount, currency, movement_date, status, category_key,
@@ -30,6 +30,11 @@ public class CashflowMovementHistoryJdbcAdapter implements CashflowMovementHisto
             """;
 
     private final JdbcTemplate jdbcTemplate;
+
+    @Autowired
+    public CashflowMovementHistoryJdbcAdapter(ObjectProvider<JdbcTemplate> jdbcTemplateProvider) {
+        this.jdbcTemplate = jdbcTemplateProvider.getIfAvailable();
+    }
 
     public CashflowMovementHistoryJdbcAdapter(JdbcTemplate jdbcTemplate) {
         this.jdbcTemplate = jdbcTemplate;
@@ -44,6 +49,7 @@ public class CashflowMovementHistoryJdbcAdapter implements CashflowMovementHisto
 
     @Override
     public Optional<CashflowMovementRecord> findById(UUID movementId) {
+        requireJdbcTemplate();
         var rows = jdbcTemplate.query(
                 SELECT_COLUMNS + " where id = ?",
                 (rs, rowNum) -> mapRow(rs),
@@ -54,6 +60,7 @@ public class CashflowMovementHistoryJdbcAdapter implements CashflowMovementHisto
 
     @Override
     public List<CashflowMovementRecord> findPendingManualReviews(ProfileId profileId) {
+        requireJdbcTemplate();
         return jdbcTemplate.query(
                 SELECT_COLUMNS + " where profile_id = ? and status = ? order by movement_date, created_at",
                 (rs, rowNum) -> mapRow(rs),
@@ -64,6 +71,7 @@ public class CashflowMovementHistoryJdbcAdapter implements CashflowMovementHisto
 
     @Override
     public List<CashflowMovementRecord> findProjectionReady(ProfileId profileId) {
+        requireJdbcTemplate();
         return jdbcTemplate.query(
                 SELECT_COLUMNS + " where profile_id = ? and status = ? order by movement_date, created_at",
                 (rs, rowNum) -> mapRow(rs),
@@ -74,6 +82,7 @@ public class CashflowMovementHistoryJdbcAdapter implements CashflowMovementHisto
 
     @Override
     public Optional<CashflowMovementRecord> resolveManualReview(ManualReviewMovementResolutionCommand command) {
+        requireJdbcTemplate();
         var updated = jdbcTemplate.update("""
                         update cashflow_movement_history
                         set status = ?, category_key = ?, resolved_at = ?, updated_at = ?
@@ -94,6 +103,7 @@ public class CashflowMovementHistoryJdbcAdapter implements CashflowMovementHisto
     }
 
     private CashflowMovementRecord save(CashflowMovementDraft draft) {
+        requireJdbcTemplate();
         var id = UUID.randomUUID();
         var now = Instant.now();
         jdbcTemplate.update("""
@@ -118,6 +128,12 @@ public class CashflowMovementHistoryJdbcAdapter implements CashflowMovementHisto
                 Timestamp.from(now)
         );
         return findById(id).orElseThrow(() -> new IllegalStateException("Saved movement was not found"));
+    }
+
+    private void requireJdbcTemplate() {
+        if (jdbcTemplate == null) {
+            throw new IllegalStateException("JdbcTemplate is required for cashflow movement history persistence");
+        }
     }
 
     private CashflowMovementRecord mapRow(ResultSet rs) throws SQLException {

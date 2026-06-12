@@ -47,7 +47,8 @@ class FlywaySeedIntegrationTest {
         var service = new PharmacyCashflowService(
                 profileService,
                 categorizationPort,
-                new SensitiveDataPolicy(List.of())
+                new SensitiveDataPolicy(List.of()),
+                new CashflowMovementHistoryJdbcAdapter(jdbcTemplate)
         );
 
         var result = service.ingest(new PharmacyCashflowService.CashflowIngestionCommand(

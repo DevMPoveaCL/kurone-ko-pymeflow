@@ -7,6 +7,7 @@ import com.kuroneko.pymeflow.application.cashflow.ManualReviewResolutionService;
 import com.kuroneko.pymeflow.application.cashflow.PharmacyCashflowService;
 import com.kuroneko.pymeflow.application.cashflow.SensitiveDataPolicy;
 import com.kuroneko.pymeflow.application.port.out.CashflowCategorizationPort;
+import com.kuroneko.pymeflow.application.port.out.CashflowMovementHistoryPort;
 import com.kuroneko.pymeflow.application.port.out.ProfileRegistryPort;
 import com.kuroneko.pymeflow.application.vertical.VerticalProfileService;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnBean;
@@ -33,9 +34,15 @@ public class ApplicationServiceConfiguration {
     PharmacyCashflowService pharmacyCashflowService(
             VerticalProfileService verticalProfileService,
             CashflowCategorizationPort cashflowCategorizationPort,
-            SensitiveDataPolicy sensitiveDataPolicy
+            SensitiveDataPolicy sensitiveDataPolicy,
+            CashflowMovementHistoryPort cashflowMovementHistoryPort
     ) {
-        return new PharmacyCashflowService(verticalProfileService, cashflowCategorizationPort, sensitiveDataPolicy);
+        return new PharmacyCashflowService(
+                verticalProfileService,
+                cashflowCategorizationPort,
+                sensitiveDataPolicy,
+                cashflowMovementHistoryPort
+        );
     }
 
     @Bean

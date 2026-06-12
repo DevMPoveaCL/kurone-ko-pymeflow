@@ -25,6 +25,7 @@ import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.Currency;
 import java.util.List;
+import java.util.UUID;
 
 @RestController
 @RequestMapping("/api/cashflow/ingestions")
@@ -42,7 +43,7 @@ public class CashflowIngestionController {
     @PostMapping
     @Operation(
             summary = "Ingestar movimientos de caja simulados",
-            description = "Clasifica movimientos de caja de forma transitoria, sin persistir transacciones."
+            description = "Clasifica movimientos de caja y persiste solo campos seguros para historial."
     )
     public ResponseEntity<CashflowIngestionResponse> ingest(@Valid @RequestBody CashflowIngestionRequest request) {
         var command = new CashflowIngestionCommand(
@@ -101,9 +102,10 @@ public class CashflowIngestionController {
         }
     }
 
-    public record CategorizedTransactionResponse(TransactionResponse transaction, CategoryResponse category) {
+    public record CategorizedTransactionResponse(UUID movementId, TransactionResponse transaction, CategoryResponse category) {
         static CategorizedTransactionResponse from(PharmacyCashflowService.CategorizedTransaction result) {
             return new CategorizedTransactionResponse(
+                    result.movementId(),
                     TransactionResponse.from(result.transaction()),
                     result.assignment().category()
                             .map(CategoryResponse::from)
@@ -112,16 +114,17 @@ public class CashflowIngestionController {
         }
     }
 
-    public record ManualReviewTransactionResponse(TransactionResponse transaction, String reason) {
+    public record ManualReviewTransactionResponse(UUID movementId, TransactionResponse transaction, String reason) {
         static ManualReviewTransactionResponse from(PharmacyCashflowService.ManualReviewTransaction result) {
-            return new ManualReviewTransactionResponse(TransactionResponse.from(result.transaction()), MANUAL_REVIEW_REASON);
+            return new ManualReviewTransactionResponse(result.movementId(), TransactionResponse.from(result.transaction()), MANUAL_REVIEW_REASON);
         }
     }
 
-    public record RejectedTransactionResponse(BigDecimal amount, String currency, LocalDate date, String reasonCode, String reason) {
+    public record RejectedTransactionResponse(UUID movementId, BigDecimal amount, String currency, LocalDate date, String reasonCode, String reason) {
         static RejectedTransactionResponse from(PharmacyCashflowService.RejectedTransaction result) {
             var transaction = result.transaction();
             return new RejectedTransactionResponse(
+                    result.movementId(),
                     transaction.amount(),
                     transaction.currency().getCurrencyCode(),
                     transaction.bookedAt(),

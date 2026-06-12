@@ -17,6 +17,7 @@ import java.time.LocalDate;
 import java.util.Currency;
 import java.util.List;
 import java.util.Optional;
+import java.util.UUID;
 
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.when;
@@ -40,6 +41,7 @@ class CashflowIngestionControllerTest {
         var transaction = transaction("Venta Caja 1", 125000);
         when(pharmacyCashflowService.ingest(any())).thenReturn(new PharmacyCashflowService.CashflowIngestionResult(
                 List.of(new PharmacyCashflowService.CategorizedTransaction(
+                        UUID.fromString("11111111-1111-1111-1111-111111111111"),
                         transaction,
                         new CategoryAssignment(Optional.of(category), false)
                 )),
@@ -51,6 +53,7 @@ class CashflowIngestionControllerTest {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(validPayload("Venta Caja 1")))
                 .andExpect(status().isOk())
+                .andExpect(jsonPath("$.categorized[0].movementId").value("11111111-1111-1111-1111-111111111111"))
                 .andExpect(jsonPath("$.categorized[0].transaction.description").value("Venta Caja 1"))
                 .andExpect(jsonPath("$.categorized[0].category.key").value("sales"))
                 .andExpect(jsonPath("$.manualReview").isEmpty())
@@ -83,6 +86,7 @@ class CashflowIngestionControllerTest {
         when(pharmacyCashflowService.ingest(any())).thenReturn(new PharmacyCashflowService.CashflowIngestionResult(
                 List.of(),
                 List.of(new PharmacyCashflowService.ManualReviewTransaction(
+                        UUID.fromString("22222222-2222-2222-2222-222222222222"),
                         transaction,
                         new CategoryAssignment(Optional.empty(), true)
                 )),
@@ -93,6 +97,7 @@ class CashflowIngestionControllerTest {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(validPayload("Venta Caja 2")))
                 .andExpect(status().isOk())
+                .andExpect(jsonPath("$.manualReview[0].movementId").value("22222222-2222-2222-2222-222222222222"))
                 .andExpect(jsonPath("$.manualReview[0].transaction.description").value("Venta Caja 2"))
                 .andExpect(jsonPath("$.manualReview[0].reason").value("Requiere clasificación manual."));
     }
@@ -104,6 +109,7 @@ class CashflowIngestionControllerTest {
                 List.of(),
                 List.of(),
                 List.of(new PharmacyCashflowService.RejectedTransaction(
+                        UUID.fromString("33333333-3333-3333-3333-333333333333"),
                         transaction(sensitiveDescription, 42000),
                         "SENSITIVE_IDENTIFIER_REJECTED"
                 ))
@@ -113,6 +119,7 @@ class CashflowIngestionControllerTest {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(validPayload(sensitiveDescription)))
                 .andExpect(status().isOk())
+                .andExpect(jsonPath("$.rejected[0].movementId").value("33333333-3333-3333-3333-333333333333"))
                 .andExpect(jsonPath("$.rejected[0].reasonCode").value("SENSITIVE_IDENTIFIER_REJECTED"))
                 .andExpect(jsonPath("$.rejected[0].reason").value("La transacción contiene datos sensibles y no fue clasificada."))
                 .andExpect(jsonPath("$.rejected[0].description").doesNotExist())
