@@ -1,0 +1,78 @@
+pymeflow:
+  vertical-profile:
+    active-profile-id: ${PYMEFLOW_ACTIVE_PROFILE:pharmacy-cl}
+    mock-providers:
+      bank-settlements: ${PYMEFLOW_MOCK_BANK_SETTLEMENTS:false}
+      acquirer-settlements: ${PYMEFLOW_MOCK_ACQUIRER_SETTLEMENTS:false}
+    recommendation-template-path: classpath:templates/pharmacy-recommendations.es.mustache
+    sensitive-identifiers:
+      - receta
+      - prescripcion
+      - prescripción
+      - paciente
+      - clinical
+      - patient
+    profiles:
+      - id: pharmacy-cl
+        display-name: Farmacia chilena
+        categories:
+          - key: sales
+            display-name: Ventas
+            direction: INFLOW
+          - key: acquirer-settlements
+            display-name: Abonos de adquirente
+            direction: INFLOW
+          - key: suppliers
+            display-name: Proveedores
+            direction: OUTFLOW
+          - key: rent
+            display-name: Arriendo
+            direction: OUTFLOW
+          - key: payroll
+            display-name: Remuneraciones
+            direction: OUTFLOW
+          - key: utilities
+            display-name: Servicios básicos
+            direction: OUTFLOW
+          - key: subscriptions
+            display-name: Suscripciones
+            direction: OUTFLOW
+          - key: bank-fees
+            display-name: Comisiones bancarias
+            direction: OUTFLOW
+          - key: recurring-obligations
+            display-name: Obligaciones recurrentes
+            direction: OUTFLOW
+        rules:
+          - key: low-balance-warning
+            condition: projected_balance_below_threshold
+            threshold: 250000
+            action-key: low-balance-warning
+          - key: overdue-alert
+            condition: obligations_due_before_cash_inflow
+            threshold: 0
+            action-key: overdue-alert
+          - key: healthy-status
+            condition: projected_balance_above_threshold
+            threshold: 750000
+            action-key: healthy-status
+        obligations:
+          - key: main-supplier
+            display-name: Pago a proveedor principal
+            estimated-amount: 1200000
+            frequency: P1M
+            due-day-of-month: 10
+          - key: rent
+            display-name: Arriendo del local
+            estimated-amount: 900000
+            frequency: P1M
+            due-day-of-month: 5
+          - key: payroll
+            display-name: Remuneraciones del equipo
+            estimated-amount: 1800000
+            frequency: P1M
+            due-day-of-month: 30
+        templates:
+          low-balance-warning: low-balance-warning
+          overdue-alert: overdue-alert
+          healthy-status: healthy-status

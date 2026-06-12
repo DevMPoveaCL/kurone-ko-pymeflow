@@ -1,0 +1,28 @@
+.gradle/
+build/
+/out/
+*.log
+*.tmp
+!.gradle/wrapper/gradle-wrapper.properties
+
+# Local environment / secrets
+.env
+.env.*
+!.env.example
+*.local
+
+# IDE / OS files
+.idea/
+.vscode/
+*.iml
+.DS_Store
+Thumbs.db
+
+# Local AI/tooling artifacts
+.atl/
+.playwright-mcp/
+
+# Runtime data
+logs/
+tmp/
+*.pid

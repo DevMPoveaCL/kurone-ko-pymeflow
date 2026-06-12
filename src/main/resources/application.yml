@@ -1,0 +1,22 @@
+spring:
+  application:
+    name: kurone-ko-bank
+  config:
+    import: optional:classpath:application-vertical.yml
+  datasource:
+    url: ${PYMEFLOW_DATASOURCE_URL:jdbc:postgresql://localhost:5432/pymeflow}
+    username: ${PYMEFLOW_DATASOURCE_USERNAME:pymeflow}
+    password: ${PYMEFLOW_DATASOURCE_PASSWORD:pymeflow_local}
+  flyway:
+    enabled: true
+    locations: classpath:db/migration
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info
+
+springdoc:
+  swagger-ui:
+    path: /swagger-ui.html
