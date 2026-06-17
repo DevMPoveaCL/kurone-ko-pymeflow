@@ -87,13 +87,20 @@ Checklist de inspección:
 - `GET /api/profiles/active` devuelve el perfil vertical activo.
 - `GET /api/profiles/active/rules` muestra las reglas cargadas por Flyway.
 - `GET /api/profiles/active/categories` muestra las categorías del perfil.
-- `POST /api/cashflow/ingestions` permite probar ingesta simulada sin persistir transacciones.
-- `POST /api/cashflow/manual-review/resolutions` permite convertir un movimiento en revisión manual en una transacción proyectable transitoria.
+- `POST /api/cashflow/ingestions` permite probar ingesta simulada y devuelve `movementId` para el historial persistido seguro.
+- `GET /api/cashflow/history/manual-review` lista movimientos pendientes de revisión manual por perfil.
+- `POST /api/cashflow/manual-review/resolutions/{movementId}` resuelve una vez un movimiento persistido por id.
+- `GET /api/cashflow/history/projection-ready` lista transacciones listas para usar en una proyección transitoria.
+- `POST /api/cashflow/manual-review/resolutions` mantiene el flujo transitorio compatible, sin historial persistido.
 - `POST /api/cashflow/projections` permite probar una proyección transitoria desde transacciones categorizadas.
 
 Si Swagger UI no carga, revise primero los logs de arranque, la conexión a PostgreSQL y que la app esté escuchando en `localhost:8080`. No hace falta un frontend para esta verificación.
 
-## Ingesta simulada de caja
+## Flujo persistido de historial de caja
+
+Este flujo valida el MVP de historial persistido sin agregar lógica bancaria ni reglas específicas de un comercio. Los ejemplos usan `pharmacy-cl` como perfil vertical configurable y texto seguro de caja para el mercado chileno.
+
+### 1. Ingestar movimientos y recibir `movementId`
 
 Endpoint Swagger:
 
@@ -124,12 +131,13 @@ Payload de ejemplo:
 }
 ```
 
-Respuesta esperada para una transacción categorizada:
+Respuesta esperada para una transacción categorizada y otra pendiente de revisión manual:
 
 ```json
 {
   "categorized": [
     {
+      "movementId": "11111111-1111-1111-1111-111111111111",
       "transaction": {
         "description": "Venta Caja 1",
         "amount": 125000,
@@ -143,18 +151,9 @@ Respuesta esperada para una transacción categorizada:
       }
     }
   ],
-  "manualReview": [],
-  "rejected": []
-}
-```
-
-Respuesta esperada para una transacción que requiere revisión manual:
-
-```json
-{
-  "categorized": [],
   "manualReview": [
     {
+      "movementId": "22222222-2222-2222-2222-222222222222",
       "transaction": {
         "description": "Movimiento sin clasificacion",
         "amount": 88000,
@@ -168,7 +167,163 @@ Respuesta esperada para una transacción que requiere revisión manual:
 }
 ```
 
-Use este resultado como punto de partida para la resolución manual. No copie descripciones sensibles ni transacciones rechazadas hacia la resolución; solo resuelva movimientos del bloque `manualReview`.
+Use el `movementId` del bloque `manualReview` para consultar y resolver el movimiento persistido. No copie descripciones sensibles ni transacciones rechazadas hacia la resolución.
+
+### 2. Leer movimientos pendientes de revisión manual
+
+Endpoint Swagger:
+
+```text
+http://localhost:8080/swagger-ui.html
+GET /api/cashflow/history/manual-review?profileId=pharmacy-cl
+```
+
+Respuesta esperada:
+
+```json
+[
+  {
+    "movementId": "22222222-2222-2222-2222-222222222222",
+    "amount": 88000,
+    "currency": "CLP",
+    "date": "2026-06-11",
+    "description": "Movimiento sin clasificacion",
+    "sourceReference": null,
+    "status": "MANUAL_REVIEW"
+  }
+]
+```
+
+La respuesta contiene solo campos seguros persistidos. En este flujo de ingesta Swagger no se envía referencia de origen, por eso `sourceReference` queda `null`. No debe incluir descripciones sensibles, datos de salud, documentos, tarjetas ni otros identificadores personales.
+
+### 3. Resolver por id una sola vez
+
+Endpoint Swagger:
+
+```text
+http://localhost:8080/swagger-ui.html
+POST /api/cashflow/manual-review/resolutions/{movementId}
+```
+
+Payload de ejemplo para `22222222-2222-2222-2222-222222222222`:
+
+```json
+{
+  "profileId": "pharmacy-cl",
+  "chosenCategoryKey": "sales",
+  "description": "Venta Caja 1",
+  "sourceReference": "caja-1"
+}
+```
+
+Respuesta esperada:
+
+```json
+{
+  "transaction": {
+    "movementId": "22222222-2222-2222-2222-222222222222",
+    "categoryKey": "sales",
+    "amount": 88000,
+    "currency": "CLP",
+    "date": "2026-06-11",
+    "status": "PROJECTABLE"
+  },
+  "category": {
+    "key": "sales",
+    "displayName": "Ventas",
+    "direction": "INFLOW"
+  },
+  "description": "Movimiento sin clasificacion",
+  "sourceReference": null
+}
+```
+
+La resolución por id valida `description` y `sourceReference` opcionales del payload para evitar texto sensible, pero no reemplaza el contexto seguro ya persistido durante la ingesta.
+
+Si repite la resolución del mismo `movementId`, la API debe rechazarla con un mensaje neutral como `El movimiento ya fue resuelto o no está disponible para revisión manual.`.
+
+### 4. Leer transacciones listas para proyección
+
+Endpoint Swagger:
+
+```text
+http://localhost:8080/swagger-ui.html
+GET /api/cashflow/history/projection-ready?profileId=pharmacy-cl&startDate=2026-06-01&endDate=2026-06-30
+```
+
+Respuesta esperada:
+
+```json
+[
+  {
+    "movementId": "11111111-1111-1111-1111-111111111111",
+    "categoryKey": "sales",
+    "amount": 125000,
+    "currency": "CLP",
+    "date": "2026-06-11",
+    "status": "PROJECTABLE"
+  },
+  {
+    "movementId": "22222222-2222-2222-2222-222222222222",
+    "categoryKey": "sales",
+    "amount": 88000,
+    "currency": "CLP",
+    "date": "2026-06-11",
+    "status": "PROJECTABLE"
+  }
+]
+```
+
+Esta respuesta está preparada para construir el arreglo `transactions` de `POST /api/cashflow/projections`. No incluye `description` ni `sourceReference`.
+
+### 5. Usar el historial proyectable en la proyección transitoria
+
+Endpoint Swagger:
+
+```text
+http://localhost:8080/swagger-ui.html
+POST /api/cashflow/projections
+```
+
+Payload de ejemplo:
+
+```json
+{
+  "profileId": "pharmacy-cl",
+  "openingBalance": 1500000,
+  "currency": "CLP",
+  "startDate": "2026-06-11",
+  "horizonDays": 3,
+  "transactions": [
+    {
+      "categoryKey": "sales",
+      "amount": 125000,
+      "currency": "CLP",
+      "date": "2026-06-11",
+      "status": "PROJECTABLE"
+    },
+    {
+      "categoryKey": "sales",
+      "amount": 88000,
+      "currency": "CLP",
+      "date": "2026-06-11",
+      "status": "PROJECTABLE"
+    }
+  ]
+}
+```
+
+La proyección sigue siendo transitoria: el historial guarda movimientos seguros y su estado, pero no persiste resultados de proyección.
+
+### Notas de seguridad del historial persistido
+
+- Use descripciones genéricas de caja, por ejemplo `Venta Caja 1`; no use nombres de personas, identificadores de salud, documentos, tarjetas ni otros datos sensibles.
+- No persista ni use descripciones sensibles como insumo de proyección. Si una descripción sensible llega a la API, la respuesta no debe repetirla.
+- Los movimientos rechazados o sensibles nunca deben aparecer en `GET /api/cashflow/history/projection-ready`.
+- La resolución por id es de un solo uso: solo permite la transición `MANUAL_REVIEW` -> `PROJECTABLE`.
+- `chosenCategoryKey` debe existir en las categorías configuradas del perfil. Verifique primero con `GET /api/profiles/active/categories`.
+
+### Rechazo seguro por datos sensibles
 
 Payload para probar rechazo por datos sensibles:
 
@@ -194,6 +349,7 @@ Respuesta esperada para una transacción rechazada por datos sensibles:
   "manualReview": [],
   "rejected": [
     {
+      "movementId": "33333333-3333-3333-3333-333333333333",
       "amount": 42000,
       "currency": "CLP",
       "date": "2026-06-11",
@@ -203,6 +359,8 @@ Respuesta esperada para una transacción rechazada por datos sensibles:
   ]
 }
 ```
+
+El texto sensible enviado en `description` no debe quedar en la respuesta ni en campos proyectables.
 
 ## Resolución manual transitoria
 
@@ -375,3 +533,16 @@ Notas de validación visual:
 | Descripción o referencia sensible rechazada sin eco | `ManualReviewResolutionControllerTest.rejectsSensitiveDescriptionWithoutEchoingRequestText`, `ManualReviewResolutionControllerTest.rejectsSensitiveSourceReferenceWithoutEchoingRequestText`, `ManualReviewResolutionServiceTest.rejectsSensitiveDescriptionOrSourceReference` |
 | Estados `REJECTED` o `MANUAL_REVIEW` no proyectables | `ManualReviewResolutionControllerTest.rejectsRejectedOrInvalidStatusMisuseAtInterfaceBoundary`, `ManualReviewResolutionServiceTest.rejectsRejectedSourceAndManualReviewOrRejectedOutputStatus` |
 | Campos financieros inválidos | `ManualReviewResolutionControllerTest.returnsValidationErrorsForInvalidAmountCurrencyAndDate`, `ManualReviewResolutionServiceTest.rejectsInvalidFinancialFields` |
+
+## Cobertura de escenarios de historial de caja
+
+| Escenario SDD | Cobertura |
+|---|---|
+| Persistir movimiento proyectable con `movementId` | `CashflowIngestionControllerTest.returnsCategorizedTransaction`, `PharmacyCashflowServiceTest.persistsCategorizedManualReviewAndRejectedOutcomesWithSafeFields` |
+| Persistir movimiento pendiente de revisión manual | `CashflowIngestionControllerTest.returnsManualReviewTransaction`, `CashflowMovementHistoryServiceTest.returnsOnlyPendingManualReviewMovementsWithSafeFields` |
+| Rechazar texto sensible durable y no hacer eco | `CashflowIngestionControllerTest.returnsSensitiveRejectionWithoutEchoingSensitiveDescription`, `PharmacyCashflowServiceTest.persistsCategorizedManualReviewAndRejectedOutcomesWithSafeFields` |
+| Leer pendientes por perfil con campos seguros | `CashflowHistoryControllerTest.listsPendingManualReviewMovementsWithSafeFieldsOnly`, `CashflowMovementHistoryJdbcAdapterTest.listsOnlyPendingManualReviewsForProfile` |
+| Resolver por id una sola vez | `ManualReviewResolutionControllerTest.resolvesPersistedManualReviewMovementById`, `CashflowMovementHistoryServiceTest.resolvesPendingManualReviewByIdIntoProjectionReadyTransaction`, `CashflowMovementHistoryJdbcAdapterTest.resolvesPendingManualReviewWithAtomicStatusTransition` |
+| Rechazar id desconocido, categoría inválida o movimiento no disponible | `ManualReviewResolutionControllerTest.mapsPersistedResolutionFailuresToNeutralSpanishErrors`, `CashflowMovementHistoryServiceTest.rejectsUnknownMovementDoubleResolutionRejectedAndInvalidCategory` |
+| Excluir manuales, rechazados y sensibles de projection-ready | `CashflowHistoryControllerTest.listsProjectionReadyTransactionsCompatibleWithProjectionInput`, `CashflowMovementHistoryJdbcAdapterTest.listsOnlyProjectionReadyMovementsForProfile`, `CashflowMovementHistoryJdbcAdapterTest.rejectedMovementCannotBeResolvedAndResolvedMovementBecomesProjectionReady` |
+| Mantener proyección transitoria sin persistir resultados | `CashflowProjectionControllerTest.returnsProjectionResponseShape`, `CashflowProjectionServiceTest.projectsDailyBalancesFromOpeningBalanceAndCategorizedMovements` |
