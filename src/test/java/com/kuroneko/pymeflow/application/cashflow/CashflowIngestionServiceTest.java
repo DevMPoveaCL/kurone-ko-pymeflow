@@ -223,6 +223,34 @@ class CashflowIngestionServiceTest {
     }
 
     @Test
+    void blankExternalReferenceIsTreatedAsOmittedWithoutDeduplicationLookup() {
+        var profileId = new ProfileId("retail-cl");
+        var category = new CashflowCategory("sales", "Sales", CashflowDirection.INFLOW);
+        var profile = new VerticalProfile(profileId, "Retail", List.of(), List.of(category), List.of());
+        var historyPort = new RecordingHistoryPort();
+        historyPort.existing.add(record(profileId, CashflowMovementStatus.PROJECTABLE, "sales", "Venta Caja 1", "   ", null));
+        var service = new CashflowIngestionService(
+                new VerticalProfileService(id -> Optional.of(profile)),
+                (transaction, loadedProfile) -> new CategoryAssignment(Optional.of(category), false),
+                new SensitiveDataPolicy(List.of()),
+                historyPort
+        );
+
+        var result = service.ingest(new CashflowIngestionService.CashflowIngestionCommand(
+                profileId,
+                List.of(item(transaction("Venta Caja 1"), "   "))
+        ));
+
+        assertThat(historyPort.lookupCalls).hasValue(0);
+        assertThat(historyPort.drafts).singleElement()
+                .extracting(CashflowMovementDraft::sourceReference)
+                .isNull();
+        assertThat(result.categorized()).singleElement()
+                .extracting(CashflowIngestionService.CategorizedTransaction::transaction)
+                .satisfies(transaction -> assertThat(transaction.description()).isEqualTo("Venta Caja 1"));
+    }
+
+    @Test
     void sameExternalReferenceForDifferentProfileInsertsNewMovement() {
         var profileId = new ProfileId("retail-cl");
         var otherProfileId = new ProfileId("other-retail-cl");
