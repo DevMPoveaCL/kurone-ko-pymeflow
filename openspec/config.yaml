@@ -1,0 +1,59 @@
+# openspec/config.yaml
+schema: spec-driven
+
+context: |
+  Tech stack: Java 21, Spring Boot 3.3.6, Gradle 8.10.2, PostgreSQL (prod) / H2 (test)
+  Architecture: Hexagonal (domain/application/infrastructure/interfaces), enforced by ArchUnit
+  Testing: JUnit 5, AssertJ, Mockito, Spring @WebMvcTest/@JdbcTest, Testcontainers, ArchUnit, JaCoCo coverage
+  Style: Hexagonal layering — domain has zero framework dependencies, application uses port/out interfaces
+  Project: PymeFlow — cash flow management for SMBs, Chilean pharmacy vertical (pharmacy-cl)
+  Bank/provider-agnostic and commerce-vertical-agnostic positioning. User-facing docs in neutral Spanish.
+  Generated technical artifacts default to English.
+
+rules:
+  proposal:
+    - Include rollback plan for risky changes
+  specs:
+    - Use Given/When/Then for scenarios
+    - Use RFC 2119 keywords (MUST, SHALL, SHOULD, MAY)
+  design:
+    - Include sequence diagrams for complex flows
+    - Document architecture decisions with rationale
+  tasks:
+    - Group by phase, use hierarchical numbering
+    - Keep tasks completable in one session
+  apply:
+    - Follow existing hexagonal patterns: domain classes are pure POJOs, application services use port abstractions
+    - Respect strict package boundaries: domain → no framework imports; application → no infrastructure imports
+    tdd: false
+    test_command: "./gradlew.bat test --rerun-tasks"
+  verify:
+    test_command: "./gradlew.bat test --rerun-tasks"
+    build_command: "./gradlew.bat build -x test"
+    coverage_threshold: 0
+  archive:
+    - Warn before merging destructive deltas
+
+testing:
+  strict_tdd: true
+  runner:
+    framework: JUnit 5 (Platform)
+    command: "./gradlew.bat test --rerun-tasks"
+  layers:
+    unit:
+      available: true
+      tools: JUnit 5, AssertJ, Mockito
+    integration:
+      available: true
+      tools: Spring @WebMvcTest, @JdbcTest, Testcontainers
+    e2e:
+      available: false
+      tools: ""
+  coverage:
+    available: true
+    tool: JaCoCo
+    command: "./gradlew.bat jacocoTestReport"
+  quality:
+    linter: { available: false }
+    type_checker: { available: false }
+    formatter: { available: false }

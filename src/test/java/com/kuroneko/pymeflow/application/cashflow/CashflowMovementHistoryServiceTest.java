@@ -2,6 +2,8 @@ package com.kuroneko.pymeflow.application.cashflow;
 
 import com.kuroneko.pymeflow.application.port.out.CashflowMovementHistoryPort;
 import com.kuroneko.pymeflow.application.vertical.VerticalProfileService;
+import com.kuroneko.pymeflow.domain.cashflow.CategoryAssignment;
+import com.kuroneko.pymeflow.domain.cashflow.Transaction;
 import com.kuroneko.pymeflow.domain.vertical.CashflowCategory;
 import com.kuroneko.pymeflow.domain.vertical.CashflowDirection;
 import com.kuroneko.pymeflow.domain.vertical.ProfileId;
@@ -106,6 +108,37 @@ class CashflowMovementHistoryServiceTest {
     }
 
     @Test
+    void returnsFallbackGeneratedSourceReferenceWhenHistoryIsQueried() {
+        var profileService = new VerticalProfileService(id -> Optional.of(profile()));
+        var port = new FakeHistoryPort(List.of());
+        var ingestionService = new CashflowIngestionService(
+                profileService,
+                (transaction, loadedProfile) -> new CategoryAssignment(Optional.empty(), true),
+                new SensitiveDataPolicy(List.of()),
+                port
+        );
+        var historyService = new CashflowMovementHistoryService(profileService, port);
+        var transaction = new Transaction(
+                "Pago farmacia",
+                BigDecimal.valueOf(1000),
+                CLP,
+                LocalDate.of(2024, 6, 18)
+        );
+        var expectedReference = TransactionFingerprint.compute(PROFILE_ID, transaction);
+
+        ingestionService.ingest(new CashflowIngestionService.CashflowIngestionCommand(
+                PROFILE_ID,
+                List.of(new CashflowIngestionService.CashflowIngestionCommand.IngestionItem(transaction, null))
+        ));
+
+        assertThat(historyService.pendingManualReviews(PROFILE_ID)).singleElement().satisfies(movement -> {
+            assertThat(movement.description()).isEqualTo("Pago farmacia");
+            assertThat(movement.sourceReference()).isEqualTo(expectedReference);
+            assertThat(movement.sourceReference()).startsWith("fp:v1:");
+        });
+    }
+
+    @Test
     void rejectsUnknownMovementDoubleResolutionRejectedAndInvalidCategory() {
         var pending = movement(CashflowMovementStatus.MANUAL_REVIEW, null, "Venta Caja 1", null, LocalDate.of(2026, 6, 1));
         var projectable = movement(CashflowMovementStatus.PROJECTABLE, "sales", "Venta Caja 2", null, LocalDate.of(2026, 6, 2));
@@ -194,7 +227,25 @@ class CashflowMovementHistoryServiceTest {
 
         @Override
         public List<CashflowMovementRecord> saveAll(List<CashflowMovementDraft> drafts) {
-            throw new UnsupportedOperationException("not needed");
+            var now = Instant.parse("2026-06-01T00:00:00Z");
+            return drafts.stream()
+                    .map(draft -> new CashflowMovementRecord(
+                            UUID.randomUUID(),
+                            draft.profileId(),
+                            draft.amount(),
+                            draft.currency(),
+                            draft.date(),
+                            draft.status(),
+                            draft.categoryKey(),
+                            draft.safeDescription(),
+                            draft.sourceReference(),
+                            draft.rejectionReasonCode(),
+                            null,
+                            now,
+                            now
+                    ))
+                    .peek(record -> records.put(record.id(), record))
+                    .toList();
         }
 
         @Override

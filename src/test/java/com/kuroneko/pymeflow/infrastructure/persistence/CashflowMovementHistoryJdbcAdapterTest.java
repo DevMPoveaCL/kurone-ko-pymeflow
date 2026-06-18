@@ -171,6 +171,18 @@ class CashflowMovementHistoryJdbcAdapterTest {
         assertThat(second.safeDescription()).isEqualTo("Venta Caja 1");
     }
 
+    @Test
+    void duplicateFingerprintSourceReferenceReturnsExistingMovementThroughUniqueIndexCatchPath() {
+        var sourceReference = "fp:v1:4480441486d2480c6bd52d41052f0814d6a50853787d3bd4540f71482fd6a056";
+        var first = adapter.saveAll(List.of(manualReview("Venta Caja 1", sourceReference))).getFirst();
+
+        var second = adapter.saveAll(List.of(manualReview("Venta Caja 1 retry", sourceReference))).getFirst();
+
+        assertThat(second.id()).isEqualTo(first.id());
+        assertThat(second.sourceReference()).isEqualTo(sourceReference);
+        assertThat(second.safeDescription()).isEqualTo("Venta Caja 1");
+    }
+
     private static CashflowMovementDraft manualReview(String safeDescription, String sourceReference) {
         return new CashflowMovementDraft(
                 PROFILE_ID,

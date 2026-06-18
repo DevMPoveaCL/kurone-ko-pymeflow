@@ -194,9 +194,54 @@ Respuesta esperada:
 ]
 ```
 
-La respuesta contiene solo campos seguros persistidos. En este flujo de ingesta Swagger no se envía referencia de origen, por eso `sourceReference` queda `null`. No debe incluir descripciones sensibles, datos de salud, documentos, tarjetas ni otros identificadores personales.
+La respuesta contiene solo campos seguros persistidos. Si la ingesta no trae `externalReference`, PymeFlow genera una referencia segura con prefijo `fp:v1:` para evitar duplicados en reintentos. No debe incluir descripciones sensibles, datos de salud, documentos, tarjetas ni otros identificadores personales.
 
-### 3. Repetir ingesta con `externalReference` sin duplicar historial
+### 3. Repetir ingesta sin duplicar historial
+
+PymeFlow cubre dos caminos de idempotencia:
+
+- Si el cliente envía `externalReference`, se usa esa referencia externa segura.
+- Si `externalReference` se omite o viene en blanco, se genera una huella determinística segura con prefijo `fp:v1:`.
+
+Para comprobar visualmente el `sourceReference` generado en Swagger, use una descripción que no calce con reglas automáticas, por ejemplo `Movimiento fingerprint sin regla`. Los movimientos categorizados aparecen en `projection-ready`, pero esa respuesta no expone `sourceReference`.
+
+#### 3.1. Reintento sin `externalReference`
+
+Payload de ejemplo:
+
+```json
+{
+  "profileId": "pharmacy-cl",
+  "transactions": [
+    {
+      "description": "Movimiento fingerprint sin regla",
+      "amount": 125000,
+      "currency": "CLP",
+      "date": "2026-06-18"
+    }
+  ]
+}
+```
+
+Ejecute el mismo payload dos veces. Respuesta esperada del replay: mismo `movementId` y sin crear un segundo movimiento.
+
+Luego consulte:
+
+```text
+GET /api/cashflow/history/manual-review?profileId=pharmacy-cl
+```
+
+El movimiento debe mostrar una referencia generada:
+
+```json
+{
+  "description": "Movimiento fingerprint sin regla",
+  "sourceReference": "fp:v1:...",
+  "status": "MANUAL_REVIEW"
+}
+```
+
+#### 3.2. Reintento con `externalReference`
 
 Para hacer idempotente una transacción, envíe `externalReference` con un identificador externo seguro del cliente o sistema origen. No use RUT, tarjetas, datos de salud ni referencias sensibles.
 
@@ -234,7 +279,48 @@ Si repite el mismo `externalReference` para el mismo perfil, la API debe devolve
 }
 ```
 
-Respuesta esperada del replay: mismo `movementId`, estado y categoría del primer registro. Si `externalReference` se omite, la ingesta mantiene el comportamiento actual y puede crear un nuevo movimiento.
+Respuesta esperada del replay: mismo `movementId`, estado y categoría del primer registro, aunque el payload de replay tenga diferencias accidentales. Cuando necesite distinguir dos movimientos legítimos con los mismos campos seguros, envíe un `externalReference` distinto para cada movimiento.
+
+#### 3.3. Referencia en blanco
+
+Si `externalReference` viene en blanco, se trata como omitida y usa la huella `fp:v1:`:
+
+```json
+{
+  "profileId": "pharmacy-cl",
+  "transactions": [
+    {
+      "description": "Movimiento fingerprint blanco sin regla",
+      "amount": 99000,
+      "currency": "CLP",
+      "date": "2026-06-18",
+      "externalReference": "   "
+    }
+  ]
+}
+```
+
+Ejecute el mismo payload dos veces. Respuesta esperada: mismo `movementId` en ambos intentos y `sourceReference` con prefijo `fp:v1:` al revisar `GET /api/cashflow/history/manual-review?profileId=pharmacy-cl`.
+
+#### 3.4. Cambio material
+
+Si cambia un campo material seguro, como el monto, PymeFlow debe crear un nuevo movimiento porque la huella cambia:
+
+```json
+{
+  "profileId": "pharmacy-cl",
+  "transactions": [
+    {
+      "description": "Movimiento fingerprint sin regla",
+      "amount": 126000,
+      "currency": "CLP",
+      "date": "2026-06-18"
+    }
+  ]
+}
+```
+
+Respuesta esperada: `movementId` distinto al primer movimiento sin `externalReference`.
 
 ### 4. Resolver por id una sola vez
 

@@ -48,24 +48,26 @@ public final class CashflowIngestionService {
                 continue;
             }
 
-            if (externalReference != null) {
-                var existing = cashflowMovementHistoryPort.findBySourceReference(command.profileId(), externalReference);
-                if (existing.isPresent()) {
-                    resultItems.add(ResultItem.existing(existing.orElseThrow(), transaction, profile));
-                    continue;
-                }
+            var sourceReference = externalReference != null
+                    ? externalReference
+                    : TransactionFingerprint.compute(command.profileId(), transaction);
+
+            var existing = cashflowMovementHistoryPort.findBySourceReference(command.profileId(), sourceReference);
+            if (existing.isPresent()) {
+                resultItems.add(ResultItem.existing(existing.orElseThrow(), transaction, profile));
+                continue;
             }
 
             if (sensitiveDataPolicy.rejects(transaction)) {
-                outcomes.add(IngestionOutcome.rejected(transaction, command.profileId(), externalReference, SENSITIVE_IDENTIFIER_REJECTED));
+                outcomes.add(IngestionOutcome.rejected(transaction, command.profileId(), sourceReference, SENSITIVE_IDENTIFIER_REJECTED));
                 continue;
             }
 
             var assignment = cashflowCategorizationPort.categorize(transaction, profile);
             if (assignment.category().isPresent() && !assignment.requiresManualReview()) {
-                outcomes.add(IngestionOutcome.categorized(transaction, command.profileId(), externalReference, assignment));
+                outcomes.add(IngestionOutcome.categorized(transaction, command.profileId(), sourceReference, assignment));
             } else {
-                outcomes.add(IngestionOutcome.manualReview(transaction, command.profileId(), externalReference, assignment));
+                outcomes.add(IngestionOutcome.manualReview(transaction, command.profileId(), sourceReference, assignment));
             }
         }
 

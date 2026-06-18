@@ -44,7 +44,11 @@ public class CashflowIngestionController {
     @PostMapping
     @Operation(
             summary = "Ingestar movimientos de caja simulados",
-            description = "Clasifica movimientos de caja y persiste solo campos seguros para historial."
+            description = "Clasifica movimientos de caja y persiste solo campos seguros para historial. "
+                    + "Si externalReference se omite o viene en blanco, PymeFlow genera una huella determinística "
+                    + "para evitar duplicados en reintentos. Como limitación MVP, dos movimientos legítimos sin "
+                    + "referencia y con los mismos campos seguros se tratarán como el mismo movimiento; envía "
+                    + "externalReference cuando necesites distinguirlos."
     )
     public ResponseEntity<CashflowIngestionResponse> ingest(@Valid @RequestBody CashflowIngestionRequest request) {
         var command = new CashflowIngestionCommand(
