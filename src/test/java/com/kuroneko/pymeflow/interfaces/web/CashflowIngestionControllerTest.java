@@ -1,6 +1,6 @@
 package com.kuroneko.pymeflow.interfaces.web;
 
-import com.kuroneko.pymeflow.application.cashflow.PharmacyCashflowService;
+import com.kuroneko.pymeflow.application.cashflow.CashflowIngestionService;
 import com.kuroneko.pymeflow.domain.cashflow.CategoryAssignment;
 import com.kuroneko.pymeflow.domain.cashflow.Transaction;
 import com.kuroneko.pymeflow.domain.vertical.CashflowCategory;
@@ -30,7 +30,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 class CashflowIngestionControllerTest {
 
     @MockBean
-    private PharmacyCashflowService pharmacyCashflowService;
+    private CashflowIngestionService cashflowIngestionService;
 
     @Autowired
     private MockMvc mockMvc;
@@ -39,8 +39,8 @@ class CashflowIngestionControllerTest {
     void returnsCategorizedTransaction() throws Exception {
         var category = new CashflowCategory("sales", "Ventas", CashflowDirection.INFLOW);
         var transaction = transaction("Venta Caja 1", 125000);
-        when(pharmacyCashflowService.ingest(any())).thenReturn(new PharmacyCashflowService.CashflowIngestionResult(
-                List.of(new PharmacyCashflowService.CategorizedTransaction(
+        when(cashflowIngestionService.ingest(any())).thenReturn(new CashflowIngestionService.CashflowIngestionResult(
+                List.of(new CashflowIngestionService.CategorizedTransaction(
                         UUID.fromString("11111111-1111-1111-1111-111111111111"),
                         transaction,
                         new CategoryAssignment(Optional.of(category), false)
@@ -83,9 +83,9 @@ class CashflowIngestionControllerTest {
     @Test
     void returnsManualReviewTransaction() throws Exception {
         var transaction = transaction("Venta Caja 2", 88000);
-        when(pharmacyCashflowService.ingest(any())).thenReturn(new PharmacyCashflowService.CashflowIngestionResult(
+        when(cashflowIngestionService.ingest(any())).thenReturn(new CashflowIngestionService.CashflowIngestionResult(
                 List.of(),
-                List.of(new PharmacyCashflowService.ManualReviewTransaction(
+                List.of(new CashflowIngestionService.ManualReviewTransaction(
                         UUID.fromString("22222222-2222-2222-2222-222222222222"),
                         transaction,
                         new CategoryAssignment(Optional.empty(), true)
@@ -105,10 +105,10 @@ class CashflowIngestionControllerTest {
     @Test
     void returnsSensitiveRejectionWithoutEchoingSensitiveDescription() throws Exception {
         var sensitiveDescription = "Venta Caja 1 receta 12345";
-        when(pharmacyCashflowService.ingest(any())).thenReturn(new PharmacyCashflowService.CashflowIngestionResult(
+        when(cashflowIngestionService.ingest(any())).thenReturn(new CashflowIngestionService.CashflowIngestionResult(
                 List.of(),
                 List.of(),
-                List.of(new PharmacyCashflowService.RejectedTransaction(
+                List.of(new CashflowIngestionService.RejectedTransaction(
                         UUID.fromString("33333333-3333-3333-3333-333333333333"),
                         transaction(sensitiveDescription, 42000),
                         "SENSITIVE_IDENTIFIER_REJECTED"

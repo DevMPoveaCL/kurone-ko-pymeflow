@@ -538,9 +538,9 @@ Notas de validación visual:
 
 | Escenario SDD | Cobertura |
 |---|---|
-| Persistir movimiento proyectable con `movementId` | `CashflowIngestionControllerTest.returnsCategorizedTransaction`, `PharmacyCashflowServiceTest.persistsCategorizedManualReviewAndRejectedOutcomesWithSafeFields` |
+| Persistir movimiento proyectable con `movementId` | `CashflowIngestionControllerTest.returnsCategorizedTransaction`, `CashflowIngestionServiceTest.persistsCategorizedManualReviewAndRejectedOutcomesWithSafeFields` |
 | Persistir movimiento pendiente de revisión manual | `CashflowIngestionControllerTest.returnsManualReviewTransaction`, `CashflowMovementHistoryServiceTest.returnsOnlyPendingManualReviewMovementsWithSafeFields` |
-| Rechazar texto sensible durable y no hacer eco | `CashflowIngestionControllerTest.returnsSensitiveRejectionWithoutEchoingSensitiveDescription`, `PharmacyCashflowServiceTest.persistsCategorizedManualReviewAndRejectedOutcomesWithSafeFields` |
+| Rechazar texto sensible durable y no hacer eco | `CashflowIngestionControllerTest.returnsSensitiveRejectionWithoutEchoingSensitiveDescription`, `CashflowIngestionServiceTest.persistsCategorizedManualReviewAndRejectedOutcomesWithSafeFields` |
 | Leer pendientes por perfil con campos seguros | `CashflowHistoryControllerTest.listsPendingManualReviewMovementsWithSafeFieldsOnly`, `CashflowMovementHistoryJdbcAdapterTest.listsOnlyPendingManualReviewsForProfile` |
 | Resolver por id una sola vez | `ManualReviewResolutionControllerTest.resolvesPersistedManualReviewMovementById`, `CashflowMovementHistoryServiceTest.resolvesPendingManualReviewByIdIntoProjectionReadyTransaction`, `CashflowMovementHistoryJdbcAdapterTest.resolvesPendingManualReviewWithAtomicStatusTransition` |
 | Rechazar id desconocido, categoría inválida o movimiento no disponible | `ManualReviewResolutionControllerTest.mapsPersistedResolutionFailuresToNeutralSpanishErrors`, `CashflowMovementHistoryServiceTest.rejectsUnknownMovementDoubleResolutionRejectedAndInvalidCategory` |

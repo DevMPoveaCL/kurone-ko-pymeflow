@@ -1,6 +1,6 @@
 package com.kuroneko.pymeflow.infrastructure.persistence;
 
-import com.kuroneko.pymeflow.application.cashflow.PharmacyCashflowService;
+import com.kuroneko.pymeflow.application.cashflow.CashflowIngestionService;
 import com.kuroneko.pymeflow.application.cashflow.SensitiveDataPolicy;
 import com.kuroneko.pymeflow.application.port.out.CashflowCategorizationPort;
 import com.kuroneko.pymeflow.application.vertical.VerticalProfileService;
@@ -44,14 +44,14 @@ class FlywaySeedIntegrationTest {
                 .findFirst()
                 .map(category -> new CategoryAssignment(Optional.of(category), false))
                 .orElseGet(() -> new CategoryAssignment(Optional.empty(), true));
-        var service = new PharmacyCashflowService(
+        var service = new CashflowIngestionService(
                 profileService,
                 categorizationPort,
                 new SensitiveDataPolicy(List.of()),
                 new CashflowMovementHistoryJdbcAdapter(jdbcTemplate)
         );
 
-        var result = service.ingest(new PharmacyCashflowService.CashflowIngestionCommand(
+        var result = service.ingest(new CashflowIngestionService.CashflowIngestionCommand(
                 new ProfileId("pharmacy-cl"),
                 List.of(new Transaction("Venta Caja 1", BigDecimal.valueOf(1000), Currency.getInstance("CLP"), LocalDate.of(2026, 6, 1)))
         ));

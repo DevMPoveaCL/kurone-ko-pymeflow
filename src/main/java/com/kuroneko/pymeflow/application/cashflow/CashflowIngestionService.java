@@ -11,7 +11,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
 
-public final class PharmacyCashflowService {
+public final class CashflowIngestionService {
     private static final String SENSITIVE_IDENTIFIER_REJECTED = "SENSITIVE_IDENTIFIER_REJECTED";
 
     private final VerticalProfileService verticalProfileService;
@@ -19,7 +19,7 @@ public final class PharmacyCashflowService {
     private final SensitiveDataPolicy sensitiveDataPolicy;
     private final CashflowMovementHistoryPort cashflowMovementHistoryPort;
 
-    public PharmacyCashflowService(
+    public CashflowIngestionService(
             VerticalProfileService verticalProfileService,
             CashflowCategorizationPort cashflowCategorizationPort,
             SensitiveDataPolicy sensitiveDataPolicy,

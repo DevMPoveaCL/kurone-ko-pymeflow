@@ -1,8 +1,8 @@
 package com.kuroneko.pymeflow.interfaces.web;
 
-import com.kuroneko.pymeflow.application.cashflow.PharmacyCashflowService;
-import com.kuroneko.pymeflow.application.cashflow.PharmacyCashflowService.CashflowIngestionCommand;
-import com.kuroneko.pymeflow.application.cashflow.PharmacyCashflowService.CashflowIngestionResult;
+import com.kuroneko.pymeflow.application.cashflow.CashflowIngestionService;
+import com.kuroneko.pymeflow.application.cashflow.CashflowIngestionService.CashflowIngestionCommand;
+import com.kuroneko.pymeflow.application.cashflow.CashflowIngestionService.CashflowIngestionResult;
 import com.kuroneko.pymeflow.domain.cashflow.Transaction;
 import com.kuroneko.pymeflow.domain.vertical.CashflowCategory;
 import com.kuroneko.pymeflow.domain.vertical.ProfileId;
@@ -34,10 +34,10 @@ public class CashflowIngestionController {
     private static final String MANUAL_REVIEW_REASON = "Requiere clasificación manual.";
     private static final String SENSITIVE_REJECTION_REASON = "La transacción contiene datos sensibles y no fue clasificada.";
 
-    private final PharmacyCashflowService pharmacyCashflowService;
+    private final CashflowIngestionService cashflowIngestionService;
 
-    public CashflowIngestionController(PharmacyCashflowService pharmacyCashflowService) {
-        this.pharmacyCashflowService = pharmacyCashflowService;
+    public CashflowIngestionController(CashflowIngestionService cashflowIngestionService) {
+        this.cashflowIngestionService = cashflowIngestionService;
     }
 
     @PostMapping
@@ -51,7 +51,7 @@ public class CashflowIngestionController {
                 request.transactions().stream().map(CashflowTransactionRequest::toTransaction).toList()
         );
 
-        return ResponseEntity.ok(CashflowIngestionResponse.from(pharmacyCashflowService.ingest(command)));
+        return ResponseEntity.ok(CashflowIngestionResponse.from(cashflowIngestionService.ingest(command)));
     }
 
     public record CashflowIngestionRequest(
@@ -103,7 +103,7 @@ public class CashflowIngestionController {
     }
 
     public record CategorizedTransactionResponse(UUID movementId, TransactionResponse transaction, CategoryResponse category) {
-        static CategorizedTransactionResponse from(PharmacyCashflowService.CategorizedTransaction result) {
+        static CategorizedTransactionResponse from(CashflowIngestionService.CategorizedTransaction result) {
             return new CategorizedTransactionResponse(
                     result.movementId(),
                     TransactionResponse.from(result.transaction()),
@@ -115,13 +115,13 @@ public class CashflowIngestionController {
     }
 
     public record ManualReviewTransactionResponse(UUID movementId, TransactionResponse transaction, String reason) {
-        static ManualReviewTransactionResponse from(PharmacyCashflowService.ManualReviewTransaction result) {
+        static ManualReviewTransactionResponse from(CashflowIngestionService.ManualReviewTransaction result) {
             return new ManualReviewTransactionResponse(result.movementId(), TransactionResponse.from(result.transaction()), MANUAL_REVIEW_REASON);
         }
     }
 
     public record RejectedTransactionResponse(UUID movementId, BigDecimal amount, String currency, LocalDate date, String reasonCode, String reason) {
-        static RejectedTransactionResponse from(PharmacyCashflowService.RejectedTransaction result) {
+        static RejectedTransactionResponse from(CashflowIngestionService.RejectedTransaction result) {
             var transaction = result.transaction();
             return new RejectedTransactionResponse(
                     result.movementId(),

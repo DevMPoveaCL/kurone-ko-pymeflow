@@ -23,7 +23,7 @@ import java.util.concurrent.atomic.AtomicInteger;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-class PharmacyCashflowServiceTest {
+class CashflowIngestionServiceTest {
 
     @Test
     void categorizesAcceptedTransactionsAndRejectsSensitiveIdentifiers() {
@@ -33,7 +33,7 @@ class PharmacyCashflowServiceTest {
         var profileService = new VerticalProfileService(id -> Optional.of(profile));
         CashflowCategorizationPort categorizationPort = (transaction, loadedProfile) ->
                 new CategoryAssignment(Optional.of(category), false);
-        var service = new PharmacyCashflowService(
+        var service = new CashflowIngestionService(
                 profileService,
                 categorizationPort,
                 new SensitiveDataPolicy(List.of("blocked-token")),
@@ -42,17 +42,17 @@ class PharmacyCashflowServiceTest {
         var accepted = transaction("Venta Caja 1");
         var rejected = transaction("Venta Caja 1 blocked-token");
 
-        var result = service.ingest(new PharmacyCashflowService.CashflowIngestionCommand(
+        var result = service.ingest(new CashflowIngestionService.CashflowIngestionCommand(
                 profileId,
                 List.of(accepted, rejected)
         ));
 
         assertThat(result.categorized()).singleElement()
-                .extracting(PharmacyCashflowService.CategorizedTransaction::transaction)
+                .extracting(CashflowIngestionService.CategorizedTransaction::transaction)
                 .isEqualTo(accepted);
         assertThat(result.manualReview()).isEmpty();
         assertThat(result.rejected()).singleElement()
-                .extracting(PharmacyCashflowService.RejectedTransaction::transaction)
+                .extracting(CashflowIngestionService.RejectedTransaction::transaction)
                 .isEqualTo(rejected);
     }
 
@@ -64,21 +64,21 @@ class PharmacyCashflowServiceTest {
         var profileService = new VerticalProfileService(id -> Optional.of(profile));
         CashflowCategorizationPort categorizationPort = (transaction, loadedProfile) ->
                 new CategoryAssignment(Optional.empty(), true);
-        var service = new PharmacyCashflowService(
+        var service = new CashflowIngestionService(
                 profileService,
                 categorizationPort,
                 new SensitiveDataPolicy(List.of()),
                 new RecordingHistoryPort()
         );
 
-        var result = service.ingest(new PharmacyCashflowService.CashflowIngestionCommand(
+        var result = service.ingest(new CashflowIngestionService.CashflowIngestionCommand(
                 profileId,
                 List.of(transaction("Unmatched movement"))
         ));
 
         assertThat(result.categorized()).isEmpty();
         assertThat(result.manualReview()).singleElement()
-                .extracting(PharmacyCashflowService.ManualReviewTransaction::assignment)
+                .extracting(CashflowIngestionService.ManualReviewTransaction::assignment)
                 .satisfies(assignment -> {
                     assertThat(assignment.category()).isEmpty();
                     assertThat(assignment.requiresManualReview()).isTrue();
@@ -96,14 +96,14 @@ class PharmacyCashflowServiceTest {
             categorizationCalls.incrementAndGet();
             return new CategoryAssignment(Optional.of(category), false);
         };
-        var service = new PharmacyCashflowService(
+        var service = new CashflowIngestionService(
                 profileService,
                 categorizationPort,
                 new SensitiveDataPolicy(List.of("blocked-token")),
                 new RecordingHistoryPort()
         );
 
-        var result = service.ingest(new PharmacyCashflowService.CashflowIngestionCommand(
+        var result = service.ingest(new CashflowIngestionService.CashflowIngestionCommand(
                 profileId,
                 List.of(transaction("Venta Caja 1 blocked-token"))
         ));
@@ -127,14 +127,14 @@ class PharmacyCashflowServiceTest {
             return new CategoryAssignment(Optional.of(category), false);
         };
         var historyPort = new RecordingHistoryPort();
-        var service = new PharmacyCashflowService(
+        var service = new CashflowIngestionService(
                 profileService,
                 categorizationPort,
                 new SensitiveDataPolicy(List.of("blocked-token")),
                 historyPort
         );
 
-        var result = service.ingest(new PharmacyCashflowService.CashflowIngestionCommand(
+        var result = service.ingest(new CashflowIngestionService.CashflowIngestionCommand(
                 profileId,
                 List.of(
                         transaction("Venta Caja 1"),
