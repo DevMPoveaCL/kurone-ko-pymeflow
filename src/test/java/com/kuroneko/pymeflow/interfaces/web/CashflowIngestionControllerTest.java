@@ -130,6 +130,43 @@ class CashflowIngestionControllerTest {
     }
 
     @Test
+    void returnsSensitiveExternalReferenceRejectionWithoutEchoingSensitiveText() throws Exception {
+        var sensitiveExternalReference = "rut 12.345.678-9";
+        when(cashflowIngestionService.ingest(any())).thenReturn(new CashflowIngestionService.CashflowIngestionResult(
+                List.of(),
+                List.of(),
+                List.of(new CashflowIngestionService.RejectedTransaction(
+                        UUID.fromString("44444444-4444-4444-4444-444444444444"),
+                        transaction("Venta Caja 1", 125000),
+                        "SENSITIVE_IDENTIFIER_REJECTED"
+                ))
+        ));
+
+        mockMvc.perform(post("/api/cashflow/ingestions")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "profileId": "pharmacy-cl",
+                                  "transactions": [
+                                    {
+                                      "description": "Venta Caja 1",
+                                      "amount": 125000,
+                                      "currency": "CLP",
+                                      "date": "2026-06-11",
+                                      "externalReference": "%s"
+                                    }
+                                  ]
+                                }
+                                """.formatted(sensitiveExternalReference)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.rejected[0].movementId").value("44444444-4444-4444-4444-444444444444"))
+                .andExpect(jsonPath("$.rejected[0].reasonCode").value("SENSITIVE_IDENTIFIER_REJECTED"))
+                .andExpect(jsonPath("$.rejected[0].reason").value("La transacción contiene datos sensibles y no fue clasificada."))
+                .andExpect(jsonPath("$.rejected[0].description").doesNotExist())
+                .andExpect(content().string(org.hamcrest.Matchers.not(org.hamcrest.Matchers.containsString(sensitiveExternalReference))));
+    }
+
+    @Test
     void mapsExternalReferenceToServiceCommandItem() throws Exception {
         when(cashflowIngestionService.ingest(any())).thenReturn(new CashflowIngestionService.CashflowIngestionResult(
                 List.of(),
