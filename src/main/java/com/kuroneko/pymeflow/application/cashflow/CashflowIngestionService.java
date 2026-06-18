@@ -42,19 +42,25 @@ public final class CashflowIngestionService {
         for (var item : command.items()) {
             var transaction = item.transaction();
             var externalReference = item.externalReference();
+            var sourceReference = externalReference;
+            var sensitiveExternalReference = externalReference != null && sensitiveDataPolicy.rejectsText(externalReference);
 
-            if (externalReference != null && sensitiveDataPolicy.rejectsText(externalReference)) {
-                outcomes.add(IngestionOutcome.rejected(transaction, command.profileId(), null, SENSITIVE_IDENTIFIER_REJECTED));
-                continue;
+            if (sensitiveExternalReference) {
+                sourceReference = TransactionFingerprint.compute(command.profileId(), transaction);
             }
 
-            var sourceReference = externalReference != null
-                    ? externalReference
-                    : TransactionFingerprint.compute(command.profileId(), transaction);
+            if (sourceReference == null) {
+                sourceReference = TransactionFingerprint.compute(command.profileId(), transaction);
+            }
 
             var existing = cashflowMovementHistoryPort.findBySourceReference(command.profileId(), sourceReference);
             if (existing.isPresent()) {
                 resultItems.add(ResultItem.existing(existing.orElseThrow(), transaction, profile));
+                continue;
+            }
+
+            if (sensitiveExternalReference) {
+                outcomes.add(IngestionOutcome.rejected(transaction, command.profileId(), sourceReference, SENSITIVE_IDENTIFIER_REJECTED));
                 continue;
             }
 

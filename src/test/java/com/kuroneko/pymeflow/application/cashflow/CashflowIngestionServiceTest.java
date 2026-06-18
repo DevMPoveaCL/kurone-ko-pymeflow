@@ -379,7 +379,7 @@ class CashflowIngestionServiceTest {
     }
 
     @Test
-    void sensitiveExternalReferenceIsRejectedBeforeLookupAndPersistence() {
+    void sensitiveExternalReferenceUsesFingerprintFallbackWithoutPersistingSensitiveReference() {
         var profileId = new ProfileId("retail-cl");
         var category = new CashflowCategory("sales", "Sales", CashflowDirection.INFLOW);
         var profile = new VerticalProfile(profileId, "Retail", List.of(), List.of(category), List.of());
@@ -401,12 +401,49 @@ class CashflowIngestionServiceTest {
         ));
 
         assertThat(categorizationCalls).hasValue(0);
-        assertThat(historyPort.lookupCalls).hasValue(0);
+        assertThat(historyPort.lookupCalls).hasValue(1);
         assertThat(historyPort.drafts).singleElement().satisfies(draft -> {
             assertThat(draft.status()).isEqualTo(CashflowMovementStatus.REJECTED);
-            assertThat(draft.sourceReference()).isNull();
+            assertThat(draft.sourceReference()).startsWith("fp:v1:");
+            assertThat(draft.sourceReference()).doesNotContain("rut-123");
         });
         assertThat(result.rejected()).hasSize(1);
+    }
+
+    @Test
+    void repeatedSensitiveExternalReferenceReturnsExistingRejectedMovementWithoutDuplicateInsert() {
+        var profileId = new ProfileId("retail-cl");
+        var category = new CashflowCategory("sales", "Sales", CashflowDirection.INFLOW);
+        var profile = new VerticalProfile(profileId, "Retail", List.of(), List.of(category), List.of());
+        var historyPort = new RecordingHistoryPort();
+        var service = new CashflowIngestionService(
+                new VerticalProfileService(id -> Optional.of(profile)),
+                (transaction, loadedProfile) -> new CategoryAssignment(Optional.of(category), false),
+                new SensitiveDataPolicy(List.of("rut")),
+                historyPort
+        );
+        var transaction = transaction("Venta Caja 1");
+
+        var first = service.ingest(new CashflowIngestionService.CashflowIngestionCommand(
+                profileId,
+                List.of(item(transaction, "rut-123"))
+        ));
+        var firstDraft = historyPort.drafts.getFirst();
+        historyPort.existing.add(recordFromDraft(firstDraft, first.rejected().getFirst().movementId()));
+        historyPort.drafts.clear();
+
+        var replay = service.ingest(new CashflowIngestionService.CashflowIngestionCommand(
+                profileId,
+                List.of(item(transaction, "rut-123"))
+        ));
+
+        assertThat(historyPort.drafts).isEmpty();
+        assertThat(replay.rejected()).singleElement().satisfies(rejected -> {
+            assertThat(rejected.movementId()).isEqualTo(first.rejected().getFirst().movementId());
+            assertThat(rejected.reasonCode()).isEqualTo("SENSITIVE_IDENTIFIER_REJECTED");
+        });
+        assertThat(firstDraft.sourceReference()).startsWith("fp:v1:");
+        assertThat(firstDraft.sourceReference()).doesNotContain("rut-123");
     }
 
     private static Transaction transaction(String description) {
