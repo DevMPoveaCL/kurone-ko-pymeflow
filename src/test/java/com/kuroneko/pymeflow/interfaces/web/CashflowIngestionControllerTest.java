@@ -19,7 +19,10 @@ import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.ArgumentCaptor.forClass;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
@@ -124,6 +127,40 @@ class CashflowIngestionControllerTest {
                 .andExpect(jsonPath("$.rejected[0].reason").value("La transacción contiene datos sensibles y no fue clasificada."))
                 .andExpect(jsonPath("$.rejected[0].description").doesNotExist())
                 .andExpect(content().string(org.hamcrest.Matchers.not(org.hamcrest.Matchers.containsString(sensitiveDescription))));
+    }
+
+    @Test
+    void mapsExternalReferenceToServiceCommandItem() throws Exception {
+        when(cashflowIngestionService.ingest(any())).thenReturn(new CashflowIngestionService.CashflowIngestionResult(
+                List.of(),
+                List.of(),
+                List.of()
+        ));
+
+        mockMvc.perform(post("/api/cashflow/ingestions")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "profileId": "pharmacy-cl",
+                                  "transactions": [
+                                    {
+                                      "description": "Venta Caja 1",
+                                      "amount": 125000,
+                                      "currency": "CLP",
+                                      "date": "2026-06-11",
+                                      "externalReference": " batch-001 "
+                                    }
+                                  ]
+                                }
+                                """))
+                .andExpect(status().isOk());
+
+        var captor = forClass(CashflowIngestionService.CashflowIngestionCommand.class);
+        verify(cashflowIngestionService).ingest(captor.capture());
+        assertThat(captor.getValue().items()).singleElement().satisfies(item -> {
+            assertThat(item.transaction().description()).isEqualTo("Venta Caja 1");
+            assertThat(item.externalReference()).isEqualTo("batch-001");
+        });
     }
 
     private static String validPayload(String description) {

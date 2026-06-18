@@ -14,6 +14,8 @@ public interface CashflowMovementHistoryPort {
 
     Optional<CashflowMovementRecord> findById(UUID movementId);
 
+    Optional<CashflowMovementRecord> findBySourceReference(ProfileId profileId, String sourceReference);
+
     List<CashflowMovementRecord> findPendingManualReviews(ProfileId profileId);
 
     List<CashflowMovementRecord> findProjectionReady(ProfileId profileId);

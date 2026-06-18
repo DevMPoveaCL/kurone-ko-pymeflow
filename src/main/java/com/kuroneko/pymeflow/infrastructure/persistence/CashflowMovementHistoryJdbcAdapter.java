@@ -8,6 +8,7 @@ import com.kuroneko.pymeflow.application.port.out.CashflowMovementHistoryPort;
 import com.kuroneko.pymeflow.domain.vertical.ProfileId;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.ObjectProvider;
+import org.springframework.dao.DuplicateKeyException;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Repository;
 
@@ -54,6 +55,21 @@ public class CashflowMovementHistoryJdbcAdapter implements CashflowMovementHisto
                 SELECT_COLUMNS + " where id = ?",
                 (rs, rowNum) -> mapRow(rs),
                 movementId
+        );
+        return rows.stream().findFirst();
+    }
+
+    @Override
+    public Optional<CashflowMovementRecord> findBySourceReference(ProfileId profileId, String sourceReference) {
+        requireJdbcTemplate();
+        if (profileId == null || sourceReference == null || sourceReference.isBlank()) {
+            return Optional.empty();
+        }
+        var rows = jdbcTemplate.query(
+                SELECT_COLUMNS + " where profile_id = ? and source_reference = ?",
+                (rs, rowNum) -> mapRow(rs),
+                profileId.value(),
+                sourceReference.trim()
         );
         return rows.stream().findFirst();
     }
@@ -106,27 +122,35 @@ public class CashflowMovementHistoryJdbcAdapter implements CashflowMovementHisto
         requireJdbcTemplate();
         var id = UUID.randomUUID();
         var now = Instant.now();
-        jdbcTemplate.update("""
-                        insert into cashflow_movement_history
-                        (id, profile_id, amount, currency, movement_date, status, category_key,
-                         safe_description, source_reference, rejection_reason_code,
-                         resolved_at, created_at, updated_at)
-                        values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-                        """,
-                id,
-                draft.profileId().value(),
-                draft.amount(),
-                draft.currency().getCurrencyCode(),
-                draft.date(),
-                draft.status().name(),
-                draft.categoryKey(),
-                draft.safeDescription(),
-                draft.sourceReference(),
-                draft.rejectionReasonCode(),
-                null,
-                Timestamp.from(now),
-                Timestamp.from(now)
-        );
+        try {
+            jdbcTemplate.update("""
+                            insert into cashflow_movement_history
+                            (id, profile_id, amount, currency, movement_date, status, category_key,
+                             safe_description, source_reference, rejection_reason_code,
+                             resolved_at, created_at, updated_at)
+                            values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                            """,
+                    id,
+                    draft.profileId().value(),
+                    draft.amount(),
+                    draft.currency().getCurrencyCode(),
+                    draft.date(),
+                    draft.status().name(),
+                    draft.categoryKey(),
+                    draft.safeDescription(),
+                    draft.sourceReference(),
+                    draft.rejectionReasonCode(),
+                    null,
+                    Timestamp.from(now),
+                    Timestamp.from(now)
+            );
+        } catch (DuplicateKeyException exception) {
+            if (draft.sourceReference() != null) {
+                return findBySourceReference(draft.profileId(), draft.sourceReference())
+                        .orElseThrow(() -> exception);
+            }
+            throw exception;
+        }
         return findById(id).orElseThrow(() -> new IllegalStateException("Saved movement was not found"));
     }
 

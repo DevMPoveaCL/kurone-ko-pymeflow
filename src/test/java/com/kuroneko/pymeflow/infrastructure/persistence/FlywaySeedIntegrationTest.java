@@ -53,13 +53,61 @@ class FlywaySeedIntegrationTest {
 
         var result = service.ingest(new CashflowIngestionService.CashflowIngestionCommand(
                 new ProfileId("pharmacy-cl"),
-                List.of(new Transaction("Venta Caja 1", BigDecimal.valueOf(1000), Currency.getInstance("CLP"), LocalDate.of(2026, 6, 1)))
+                List.of(new CashflowIngestionService.CashflowIngestionCommand.IngestionItem(
+                        new Transaction("Venta Caja 1", BigDecimal.valueOf(1000), Currency.getInstance("CLP"), LocalDate.of(2026, 6, 1)),
+                        null
+                ))
         ));
 
         assertThat(result.rejected()).isEmpty();
         assertThat(result.categorized()).singleElement()
                 .extracting(item -> item.assignment().category().orElseThrow().key())
                 .isEqualTo("sales");
+    }
+
+    @Test
+    void replaysIngestionWithExternalReferenceIdempotently() {
+        var adapter = new VerticalProfileJpaAdapter(jdbcTemplate);
+        var profileService = new VerticalProfileService(adapter);
+        CashflowCategorizationPort categorizationPort = (transaction, profile) -> profile.categories().stream()
+                .filter(category -> category.key().equals("sales"))
+                .findFirst()
+                .map(category -> new CategoryAssignment(Optional.of(category), false))
+                .orElseGet(() -> new CategoryAssignment(Optional.empty(), true));
+        var service = new CashflowIngestionService(
+                profileService,
+                categorizationPort,
+                new SensitiveDataPolicy(List.of()),
+                new CashflowMovementHistoryJdbcAdapter(jdbcTemplate)
+        );
+        var profileId = new ProfileId("pharmacy-cl");
+        var externalReference = "swagger-batch-001";
+
+        var first = service.ingest(new CashflowIngestionService.CashflowIngestionCommand(
+                profileId,
+                List.of(new CashflowIngestionService.CashflowIngestionCommand.IngestionItem(
+                        new Transaction("Venta Caja 1", BigDecimal.valueOf(1000), Currency.getInstance("CLP"), LocalDate.of(2026, 6, 1)),
+                        externalReference
+                ))
+        ));
+        var replay = service.ingest(new CashflowIngestionService.CashflowIngestionCommand(
+                profileId,
+                List.of(new CashflowIngestionService.CashflowIngestionCommand.IngestionItem(
+                        new Transaction("Venta Caja 1 modificada", BigDecimal.valueOf(5000), Currency.getInstance("CLP"), LocalDate.of(2026, 6, 2)),
+                        externalReference
+                ))
+        ));
+
+        assertThat(replay.categorized()).singleElement()
+                .extracting(CashflowIngestionService.CategorizedTransaction::movementId)
+                .isEqualTo(first.categorized().getFirst().movementId());
+        Integer rows = jdbcTemplate.queryForObject(
+                "select count(*) from cashflow_movement_history where profile_id = ? and source_reference = ?",
+                Integer.class,
+                profileId.value(),
+                externalReference
+        );
+        assertThat(rows).isEqualTo(1);
     }
 
     @Test

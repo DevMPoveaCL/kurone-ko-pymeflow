@@ -203,6 +203,14 @@ class CashflowMovementHistoryServiceTest {
         }
 
         @Override
+        public Optional<CashflowMovementRecord> findBySourceReference(ProfileId profileId, String sourceReference) {
+            return records.values().stream()
+                    .filter(record -> record.profileId().equals(profileId))
+                    .filter(record -> sourceReference.equals(record.sourceReference()))
+                    .findFirst();
+        }
+
+        @Override
         public List<CashflowMovementRecord> findPendingManualReviews(ProfileId profileId) {
             return records.values().stream()
                     .filter(record -> record.profileId().equals(profileId))

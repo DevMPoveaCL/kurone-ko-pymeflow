@@ -5,10 +5,13 @@ import com.kuroneko.pymeflow.application.port.out.CashflowMovementHistoryPort;
 import com.kuroneko.pymeflow.application.vertical.VerticalProfileService;
 import com.kuroneko.pymeflow.domain.cashflow.CategoryAssignment;
 import com.kuroneko.pymeflow.domain.cashflow.Transaction;
+import com.kuroneko.pymeflow.domain.vertical.CashflowCategory;
 import com.kuroneko.pymeflow.domain.vertical.ProfileId;
+import com.kuroneko.pymeflow.domain.vertical.VerticalProfile;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Optional;
 import java.util.UUID;
 
 public final class CashflowIngestionService {
@@ -34,18 +37,35 @@ public final class CashflowIngestionService {
     public CashflowIngestionResult ingest(CashflowIngestionCommand command) {
         var profile = verticalProfileService.loadProfile(command.profileId());
         var outcomes = new ArrayList<IngestionOutcome>();
+        var resultItems = new ArrayList<ResultItem>();
 
-        for (Transaction transaction : command.transactions()) {
+        for (var item : command.items()) {
+            var transaction = item.transaction();
+            var externalReference = item.externalReference();
+
+            if (externalReference != null && sensitiveDataPolicy.rejectsText(externalReference)) {
+                outcomes.add(IngestionOutcome.rejected(transaction, command.profileId(), null, SENSITIVE_IDENTIFIER_REJECTED));
+                continue;
+            }
+
+            if (externalReference != null) {
+                var existing = cashflowMovementHistoryPort.findBySourceReference(command.profileId(), externalReference);
+                if (existing.isPresent()) {
+                    resultItems.add(ResultItem.existing(existing.orElseThrow(), transaction, profile));
+                    continue;
+                }
+            }
+
             if (sensitiveDataPolicy.rejects(transaction)) {
-                outcomes.add(IngestionOutcome.rejected(transaction, command.profileId(), SENSITIVE_IDENTIFIER_REJECTED));
+                outcomes.add(IngestionOutcome.rejected(transaction, command.profileId(), externalReference, SENSITIVE_IDENTIFIER_REJECTED));
                 continue;
             }
 
             var assignment = cashflowCategorizationPort.categorize(transaction, profile);
             if (assignment.category().isPresent() && !assignment.requiresManualReview()) {
-                outcomes.add(IngestionOutcome.categorized(transaction, command.profileId(), assignment));
+                outcomes.add(IngestionOutcome.categorized(transaction, command.profileId(), externalReference, assignment));
             } else {
-                outcomes.add(IngestionOutcome.manualReview(transaction, command.profileId(), assignment));
+                outcomes.add(IngestionOutcome.manualReview(transaction, command.profileId(), externalReference, assignment));
             }
         }
 
@@ -53,30 +73,47 @@ public final class CashflowIngestionService {
                 .map(IngestionOutcome::draft)
                 .toList());
 
+        for (int index = 0; index < outcomes.size(); index++) {
+            resultItems.add(ResultItem.saved(outcomes.get(index), records.get(index)));
+        }
+
         var categorized = new ArrayList<CategorizedTransaction>();
         var manualReview = new ArrayList<ManualReviewTransaction>();
         var rejected = new ArrayList<RejectedTransaction>();
-        for (int index = 0; index < outcomes.size(); index++) {
-            var outcome = outcomes.get(index);
-            var record = records.get(index);
-            if (outcome.status() == CashflowMovementStatus.PROJECTABLE) {
-                categorized.add(new CategorizedTransaction(record.id(), outcome.transaction(), outcome.assignment()));
-            } else if (outcome.status() == CashflowMovementStatus.MANUAL_REVIEW) {
-                manualReview.add(new ManualReviewTransaction(record.id(), outcome.transaction(), outcome.assignment()));
+        for (var resultItem : resultItems) {
+            if (resultItem.status() == CashflowMovementStatus.PROJECTABLE) {
+                categorized.add(new CategorizedTransaction(resultItem.movementId(), resultItem.transaction(), resultItem.assignment()));
+            } else if (resultItem.status() == CashflowMovementStatus.MANUAL_REVIEW) {
+                manualReview.add(new ManualReviewTransaction(resultItem.movementId(), resultItem.transaction(), resultItem.assignment()));
             } else {
-                rejected.add(new RejectedTransaction(record.id(), outcome.transaction(), outcome.reasonCode()));
+                rejected.add(new RejectedTransaction(resultItem.movementId(), resultItem.transaction(), resultItem.reasonCode()));
             }
         }
 
         return new CashflowIngestionResult(categorized, manualReview, rejected);
     }
 
-    public record CashflowIngestionCommand(ProfileId profileId, List<Transaction> transactions) {
+    public record CashflowIngestionCommand(ProfileId profileId, List<IngestionItem> items) {
         public CashflowIngestionCommand {
             if (profileId == null) {
                 throw new IllegalArgumentException("Profile id is required");
             }
-            transactions = List.copyOf(transactions == null ? List.of() : transactions);
+            items = List.copyOf(items == null ? List.of() : items);
+        }
+
+        public List<Transaction> transactions() {
+            return items.stream().map(IngestionItem::transaction).toList();
+        }
+
+        public record IngestionItem(Transaction transaction, String externalReference) {
+            public IngestionItem {
+                if (transaction == null) {
+                    throw new IllegalArgumentException("Transaction is required");
+                }
+                externalReference = (externalReference == null || externalReference.isBlank())
+                        ? null
+                        : externalReference.trim();
+            }
         }
     }
 
@@ -144,7 +181,7 @@ public final class CashflowIngestionService {
             String reasonCode,
             CashflowMovementDraft draft
     ) {
-        static IngestionOutcome categorized(Transaction transaction, ProfileId profileId, CategoryAssignment assignment) {
+        static IngestionOutcome categorized(Transaction transaction, ProfileId profileId, String sourceReference, CategoryAssignment assignment) {
             var categoryKey = assignment.category()
                     .orElseThrow(() -> new IllegalArgumentException("Category is required"))
                     .key();
@@ -161,13 +198,13 @@ public final class CashflowIngestionService {
                             CashflowMovementStatus.PROJECTABLE,
                             categoryKey,
                             transaction.description(),
-                            null,
+                            sourceReference,
                             null
                     )
             );
         }
 
-        static IngestionOutcome manualReview(Transaction transaction, ProfileId profileId, CategoryAssignment assignment) {
+        static IngestionOutcome manualReview(Transaction transaction, ProfileId profileId, String sourceReference, CategoryAssignment assignment) {
             return new IngestionOutcome(
                     CashflowMovementStatus.MANUAL_REVIEW,
                     transaction,
@@ -181,13 +218,13 @@ public final class CashflowIngestionService {
                             CashflowMovementStatus.MANUAL_REVIEW,
                             null,
                             transaction.description(),
-                            null,
+                            sourceReference,
                             null
                     )
             );
         }
 
-        static IngestionOutcome rejected(Transaction transaction, ProfileId profileId, String reasonCode) {
+        static IngestionOutcome rejected(Transaction transaction, ProfileId profileId, String sourceReference, String reasonCode) {
             return new IngestionOutcome(
                     CashflowMovementStatus.REJECTED,
                     transaction,
@@ -201,10 +238,52 @@ public final class CashflowIngestionService {
                             CashflowMovementStatus.REJECTED,
                             null,
                             null,
-                            null,
+                            sourceReference,
                             reasonCode
                     )
             );
+        }
+    }
+
+    private record ResultItem(
+            UUID movementId,
+            CashflowMovementStatus status,
+            Transaction transaction,
+            CategoryAssignment assignment,
+            String reasonCode
+    ) {
+        static ResultItem saved(IngestionOutcome outcome, CashflowMovementRecord record) {
+            return new ResultItem(record.id(), outcome.status(), outcome.transaction(), outcome.assignment(), outcome.reasonCode());
+        }
+
+        static ResultItem existing(CashflowMovementRecord record, Transaction fallbackTransaction, VerticalProfile profile) {
+            return new ResultItem(
+                    record.id(),
+                    record.status(),
+                    transactionFrom(record, fallbackTransaction),
+                    assignmentFrom(record, profile),
+                    record.rejectionReasonCode()
+            );
+        }
+
+        private static Transaction transactionFrom(CashflowMovementRecord record, Transaction fallbackTransaction) {
+            var description = record.safeDescription() == null || record.safeDescription().isBlank()
+                    ? fallbackTransaction.description()
+                    : record.safeDescription();
+            return new Transaction(description, record.amount(), record.currency(), record.date());
+        }
+
+        private static CategoryAssignment assignmentFrom(CashflowMovementRecord record, VerticalProfile profile) {
+            if (record.status() == CashflowMovementStatus.PROJECTABLE) {
+                return new CategoryAssignment(categoryFor(record, profile), false);
+            }
+            return new CategoryAssignment(Optional.empty(), record.status() == CashflowMovementStatus.MANUAL_REVIEW);
+        }
+
+        private static Optional<CashflowCategory> categoryFor(CashflowMovementRecord record, VerticalProfile profile) {
+            return profile.categories().stream()
+                    .filter(category -> category.key().equals(record.categoryKey()))
+                    .findFirst();
         }
     }
 }

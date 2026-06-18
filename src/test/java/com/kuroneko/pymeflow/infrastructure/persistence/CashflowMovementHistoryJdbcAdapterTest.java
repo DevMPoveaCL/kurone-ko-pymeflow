@@ -49,6 +49,7 @@ class CashflowMovementHistoryJdbcAdapterTest {
         try (Connection connection = dataSource.getConnection()) {
             ScriptUtils.executeSqlScript(connection, new ClassPathResource("db/migration/V2__create_cashflow_movement_history.sql"));
         }
+        createSourceReferenceUniqueIndexForH2();
         jdbcTemplate.update("delete from cashflow_movement_history");
         jdbcTemplate.update("delete from vertical_profile_categories");
         jdbcTemplate.update("delete from vertical_profile_rules");
@@ -57,6 +58,13 @@ class CashflowMovementHistoryJdbcAdapterTest {
         jdbcTemplate.update("insert into vertical_profiles (id, display_name, enabled) values (?, ?, true)", PROFILE_ID.value(), "Comercio prueba");
         jdbcTemplate.update("insert into vertical_profile_categories (profile_id, category_key, display_name, direction, sort_order) values (?, ?, ?, ?, ?)", PROFILE_ID.value(), "sales", "Ventas", "INFLOW", 10);
         jdbcTemplate.update("insert into vertical_profile_categories (profile_id, category_key, display_name, direction, sort_order) values (?, ?, ?, ?, ?)", PROFILE_ID.value(), "supplies", "Insumos", "OUTFLOW", 20);
+    }
+
+    private void createSourceReferenceUniqueIndexForH2() {
+        jdbcTemplate.execute("""
+                create unique index if not exists idx_cashflow_movement_history_profile_source
+                on cashflow_movement_history(profile_id, source_reference)
+                """);
     }
 
     @Test
@@ -133,6 +141,34 @@ class CashflowMovementHistoryJdbcAdapterTest {
                 .extracting(record -> record.id())
                 .contains(manualReview.id())
                 .doesNotContain(rejected.id());
+    }
+
+    @Test
+    void findsMovementByProfileAndSourceReference() {
+        var otherProfile = new ProfileId("other-retail-cl");
+        jdbcTemplate.update("insert into vertical_profiles (id, display_name, enabled) values (?, ?, true)", otherProfile.value(), "Otro comercio");
+        jdbcTemplate.update("insert into vertical_profile_categories (profile_id, category_key, display_name, direction, sort_order) values (?, ?, ?, ?, ?)", otherProfile.value(), "sales", "Ventas", "INFLOW", 10);
+        var saved = adapter.saveAll(List.of(
+                manualReview("Venta Caja 1", "batch-001"),
+                new CashflowMovementDraft(otherProfile, BigDecimal.valueOf(1300), Currency.getInstance("CLP"), LocalDate.of(2026, 6, 1), CashflowMovementStatus.MANUAL_REVIEW, null, "Venta Caja 1", "batch-001", null)
+        )).getFirst();
+
+        var found = adapter.findBySourceReference(PROFILE_ID, "batch-001");
+
+        assertThat(found).isPresent();
+        assertThat(found.orElseThrow().id()).isEqualTo(saved.id());
+        assertThat(adapter.findBySourceReference(PROFILE_ID, "missing")).isEmpty();
+    }
+
+    @Test
+    void duplicateProfileAndSourceReferenceReturnsExistingMovement() {
+        var first = adapter.saveAll(List.of(manualReview("Venta Caja 1", "batch-001"))).getFirst();
+
+        var second = adapter.saveAll(List.of(manualReview("Venta Caja 1 replay", "batch-001"))).getFirst();
+
+        assertThat(second.id()).isEqualTo(first.id());
+        assertThat(adapter.findPendingManualReviews(PROFILE_ID)).hasSize(1);
+        assertThat(second.safeDescription()).isEqualTo("Venta Caja 1");
     }
 
     private static CashflowMovementDraft manualReview(String safeDescription, String sourceReference) {

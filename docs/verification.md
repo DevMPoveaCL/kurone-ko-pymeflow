@@ -196,7 +196,47 @@ Respuesta esperada:
 
 La respuesta contiene solo campos seguros persistidos. En este flujo de ingesta Swagger no se envía referencia de origen, por eso `sourceReference` queda `null`. No debe incluir descripciones sensibles, datos de salud, documentos, tarjetas ni otros identificadores personales.
 
-### 3. Resolver por id una sola vez
+### 3. Repetir ingesta con `externalReference` sin duplicar historial
+
+Para hacer idempotente una transacción, envíe `externalReference` con un identificador externo seguro del cliente o sistema origen. No use RUT, tarjetas, datos de salud ni referencias sensibles.
+
+Payload de ejemplo:
+
+```json
+{
+  "profileId": "pharmacy-cl",
+  "transactions": [
+    {
+      "description": "Venta Caja 1",
+      "amount": 125000,
+      "currency": "CLP",
+      "date": "2026-06-11",
+      "externalReference": "venta-caja-1-20260611-001"
+    }
+  ]
+}
+```
+
+Si repite el mismo `externalReference` para el mismo perfil, la API debe devolver el `movementId` original y no crear un segundo movimiento, incluso si el payload de replay trae diferencias accidentales:
+
+```json
+{
+  "profileId": "pharmacy-cl",
+  "transactions": [
+    {
+      "description": "Venta Caja 1 corregida",
+      "amount": 999999,
+      "currency": "CLP",
+      "date": "2026-06-12",
+      "externalReference": "venta-caja-1-20260611-001"
+    }
+  ]
+}
+```
+
+Respuesta esperada del replay: mismo `movementId`, estado y categoría del primer registro. Si `externalReference` se omite, la ingesta mantiene el comportamiento actual y puede crear un nuevo movimiento.
+
+### 4. Resolver por id una sola vez
 
 Endpoint Swagger:
 
@@ -242,7 +282,7 @@ La resolución por id valida `description` y `sourceReference` opcionales del pa
 
 Si repite la resolución del mismo `movementId`, la API debe rechazarla con un mensaje neutral como `El movimiento ya fue resuelto o no está disponible para revisión manual.`.
 
-### 4. Leer transacciones listas para proyección
+### 5. Leer transacciones listas para proyección
 
 Endpoint Swagger:
 

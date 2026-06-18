@@ -2,6 +2,7 @@ package com.kuroneko.pymeflow.interfaces.web;
 
 import com.kuroneko.pymeflow.application.cashflow.CashflowIngestionService;
 import com.kuroneko.pymeflow.application.cashflow.CashflowIngestionService.CashflowIngestionCommand;
+import com.kuroneko.pymeflow.application.cashflow.CashflowIngestionService.CashflowIngestionCommand.IngestionItem;
 import com.kuroneko.pymeflow.application.cashflow.CashflowIngestionService.CashflowIngestionResult;
 import com.kuroneko.pymeflow.domain.cashflow.Transaction;
 import com.kuroneko.pymeflow.domain.vertical.CashflowCategory;
@@ -48,7 +49,7 @@ public class CashflowIngestionController {
     public ResponseEntity<CashflowIngestionResponse> ingest(@Valid @RequestBody CashflowIngestionRequest request) {
         var command = new CashflowIngestionCommand(
                 new ProfileId(request.profileId()),
-                request.transactions().stream().map(CashflowTransactionRequest::toTransaction).toList()
+                request.transactions().stream().map(CashflowTransactionRequest::toCommandItem).toList()
         );
 
         return ResponseEntity.ok(CashflowIngestionResponse.from(cashflowIngestionService.ingest(command)));
@@ -81,8 +82,15 @@ public class CashflowIngestionController {
 
             @NotNull(message = "La fecha es obligatoria.")
             @Schema(example = "2026-06-11")
-            LocalDate date
+            LocalDate date,
+
+            @Schema(example = "batch-001")
+            String externalReference
     ) {
+        IngestionItem toCommandItem() {
+            return new IngestionItem(toTransaction(), externalReference);
+        }
+
         Transaction toTransaction() {
             return new Transaction(description, amount, Currency.getInstance(currency), date);
         }
