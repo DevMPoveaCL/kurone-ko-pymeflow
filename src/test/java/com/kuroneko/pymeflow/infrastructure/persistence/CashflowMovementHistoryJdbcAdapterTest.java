@@ -112,6 +112,55 @@ class CashflowMovementHistoryJdbcAdapterTest {
     }
 
     @Test
+    void findsMovementsByStatusForProfileOrderedByMovementDate() {
+        var otherProfile = new ProfileId("other-retail-cl");
+        jdbcTemplate.update("insert into vertical_profiles (id, display_name, enabled) values (?, ?, true)", otherProfile.value(), "Otro comercio");
+        jdbcTemplate.update("insert into vertical_profile_categories (profile_id, category_key, display_name, direction, sort_order) values (?, ?, ?, ?, ?)", otherProfile.value(), "sales", "Ventas", "INFLOW", 10);
+        adapter.saveAll(List.of(
+                projectable("supplies", LocalDate.of(2026, 6, 4), "batch-004"),
+                manualReview("Venta Caja 1", "batch-001"),
+                projectable("sales", LocalDate.of(2026, 6, 2), "batch-002"),
+                rejected("policy-blocked"),
+                new CashflowMovementDraft(otherProfile, BigDecimal.valueOf(1800), Currency.getInstance("CLP"), LocalDate.of(2026, 6, 1), CashflowMovementStatus.PROJECTABLE, "sales", "Venta otro perfil", "other-001", null)
+        ));
+
+        var projectable = adapter.findByStatus(PROFILE_ID, CashflowMovementStatus.PROJECTABLE);
+        var manualReview = adapter.findByStatus(PROFILE_ID, CashflowMovementStatus.MANUAL_REVIEW);
+        var rejected = adapter.findByStatus(PROFILE_ID, CashflowMovementStatus.REJECTED);
+
+        assertThat(projectable)
+                .extracting(record -> record.categoryKey())
+                .containsExactly("sales", "supplies");
+        assertThat(projectable)
+                .extracting(record -> record.profileId())
+                .containsOnly(PROFILE_ID);
+        assertThat(manualReview)
+                .hasSize(1)
+                .first()
+                .satisfies(record -> {
+                    assertThat(record.status()).isEqualTo(CashflowMovementStatus.MANUAL_REVIEW);
+                    assertThat(record.safeDescription()).isEqualTo("Venta Caja 1");
+                });
+        assertThat(rejected)
+                .hasSize(1)
+                .first()
+                .satisfies(record -> {
+                    assertThat(record.status()).isEqualTo(CashflowMovementStatus.REJECTED);
+                    assertThat(record.rejectionReasonCode()).isEqualTo("policy-blocked");
+                    assertThat(record.safeDescription()).isNull();
+                });
+    }
+
+    @Test
+    void findByStatusReturnsEmptyWhenNoMovementMatchesStatus() {
+        adapter.saveAll(List.of(manualReview("Venta Caja 1", "batch-001")));
+
+        var rejected = adapter.findByStatus(PROFILE_ID, CashflowMovementStatus.REJECTED);
+
+        assertThat(rejected).isEmpty();
+    }
+
+    @Test
     void resolvesPendingManualReviewWithAtomicStatusTransition() {
         var movement = adapter.saveAll(List.of(manualReview("Venta Caja 1", null))).getFirst();
 
@@ -198,15 +247,19 @@ class CashflowMovementHistoryJdbcAdapterTest {
     }
 
     private static CashflowMovementDraft projectable(String categoryKey) {
+        return projectable(categoryKey, LocalDate.of(2026, 6, 2), "batch-002");
+    }
+
+    private static CashflowMovementDraft projectable(String categoryKey, LocalDate movementDate, String sourceReference) {
         return new CashflowMovementDraft(
                 PROFILE_ID,
                 BigDecimal.valueOf(2500),
                 Currency.getInstance("CLP"),
-                LocalDate.of(2026, 6, 2),
+                movementDate,
                 CashflowMovementStatus.PROJECTABLE,
                 categoryKey,
                 "Venta Caja 1",
-                "batch-002",
+                sourceReference,
                 null
         );
     }

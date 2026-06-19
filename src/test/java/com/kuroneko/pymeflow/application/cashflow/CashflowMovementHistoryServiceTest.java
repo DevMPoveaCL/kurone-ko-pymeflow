@@ -262,19 +262,21 @@ class CashflowMovementHistoryServiceTest {
         }
 
         @Override
-        public List<CashflowMovementRecord> findPendingManualReviews(ProfileId profileId) {
+        public List<CashflowMovementRecord> findByStatus(ProfileId profileId, CashflowMovementStatus status) {
             return records.values().stream()
                     .filter(record -> record.profileId().equals(profileId))
-                    .filter(record -> record.status() == CashflowMovementStatus.MANUAL_REVIEW)
+                    .filter(record -> record.status() == status)
                     .toList();
         }
 
         @Override
+        public List<CashflowMovementRecord> findPendingManualReviews(ProfileId profileId) {
+            return findByStatus(profileId, CashflowMovementStatus.MANUAL_REVIEW);
+        }
+
+        @Override
         public List<CashflowMovementRecord> findProjectionReady(ProfileId profileId) {
-            return records.values().stream()
-                    .filter(record -> record.profileId().equals(profileId))
-                    .filter(record -> record.status() == CashflowMovementStatus.PROJECTABLE)
-                    .toList();
+            return findByStatus(profileId, CashflowMovementStatus.PROJECTABLE);
         }
 
         @Override

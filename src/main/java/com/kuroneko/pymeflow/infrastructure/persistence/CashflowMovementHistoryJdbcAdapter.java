@@ -75,25 +75,24 @@ public class CashflowMovementHistoryJdbcAdapter implements CashflowMovementHisto
     }
 
     @Override
-    public List<CashflowMovementRecord> findPendingManualReviews(ProfileId profileId) {
+    public List<CashflowMovementRecord> findByStatus(ProfileId profileId, CashflowMovementStatus status) {
         requireJdbcTemplate();
         return jdbcTemplate.query(
                 SELECT_COLUMNS + " where profile_id = ? and status = ? order by movement_date, created_at",
                 (rs, rowNum) -> mapRow(rs),
                 profileId.value(),
-                CashflowMovementStatus.MANUAL_REVIEW.name()
+                status.name()
         );
     }
 
     @Override
+    public List<CashflowMovementRecord> findPendingManualReviews(ProfileId profileId) {
+        return findByStatus(profileId, CashflowMovementStatus.MANUAL_REVIEW);
+    }
+
+    @Override
     public List<CashflowMovementRecord> findProjectionReady(ProfileId profileId) {
-        requireJdbcTemplate();
-        return jdbcTemplate.query(
-                SELECT_COLUMNS + " where profile_id = ? and status = ? order by movement_date, created_at",
-                (rs, rowNum) -> mapRow(rs),
-                profileId.value(),
-                CashflowMovementStatus.PROJECTABLE.name()
-        );
+        return findByStatus(profileId, CashflowMovementStatus.PROJECTABLE);
     }
 
     @Override

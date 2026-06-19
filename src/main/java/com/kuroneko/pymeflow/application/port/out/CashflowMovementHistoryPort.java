@@ -2,6 +2,7 @@ package com.kuroneko.pymeflow.application.port.out;
 
 import com.kuroneko.pymeflow.application.cashflow.CashflowMovementDraft;
 import com.kuroneko.pymeflow.application.cashflow.CashflowMovementRecord;
+import com.kuroneko.pymeflow.application.cashflow.CashflowMovementStatus;
 import com.kuroneko.pymeflow.application.cashflow.ManualReviewMovementResolutionCommand;
 import com.kuroneko.pymeflow.domain.vertical.ProfileId;
 
@@ -15,6 +16,8 @@ public interface CashflowMovementHistoryPort {
     Optional<CashflowMovementRecord> findById(UUID movementId);
 
     Optional<CashflowMovementRecord> findBySourceReference(ProfileId profileId, String sourceReference);
+
+    List<CashflowMovementRecord> findByStatus(ProfileId profileId, CashflowMovementStatus status);
 
     List<CashflowMovementRecord> findPendingManualReviews(ProfileId profileId);
 

@@ -10,6 +10,7 @@ import com.kuroneko.pymeflow.application.cashflow.SensitiveDataPolicy;
 import com.kuroneko.pymeflow.application.port.out.CashflowCategorizationPort;
 import com.kuroneko.pymeflow.application.port.out.CashflowMovementHistoryPort;
 import com.kuroneko.pymeflow.application.port.out.ProfileRegistryPort;
+import com.kuroneko.pymeflow.application.recommendation.HistoryRecommendationService;
 import com.kuroneko.pymeflow.application.vertical.VerticalProfileService;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnBean;
 import org.springframework.context.annotation.Bean;
@@ -58,6 +59,14 @@ public class ApplicationServiceConfiguration {
             SensitiveDataPolicy sensitiveDataPolicy
     ) {
         return new CashflowMovementHistoryService(verticalProfileService, cashflowMovementHistoryPort, sensitiveDataPolicy);
+    }
+
+    @Bean
+    HistoryRecommendationService historyRecommendationService(
+            VerticalProfileService verticalProfileService,
+            CashflowMovementHistoryPort cashflowMovementHistoryPort
+    ) {
+        return new HistoryRecommendationService(verticalProfileService, cashflowMovementHistoryPort);
     }
 
     @Bean

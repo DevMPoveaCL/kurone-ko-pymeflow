@@ -550,6 +550,11 @@ class CashflowIngestionServiceTest {
         }
 
         @Override
+        public List<CashflowMovementRecord> findByStatus(ProfileId profileId, CashflowMovementStatus status) {
+            return List.of();
+        }
+
+        @Override
         public List<CashflowMovementRecord> findPendingManualReviews(ProfileId profileId) {
             return List.of();
         }
