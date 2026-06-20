@@ -55,7 +55,7 @@ public final class CashflowIngestionService {
 
             var existing = cashflowMovementHistoryPort.findBySourceReference(command.profileId(), sourceReference);
             if (existing.isPresent()) {
-                resultItems.add(ResultItem.existing(existing.orElseThrow(), transaction, profile));
+                resultItems.add(ResultItem.existing(existing.orElseThrow(), transaction, profile, sourceReference));
                 continue;
             }
 
@@ -90,11 +90,11 @@ public final class CashflowIngestionService {
         var rejected = new ArrayList<RejectedTransaction>();
         for (var resultItem : resultItems) {
             if (resultItem.status() == CashflowMovementStatus.PROJECTABLE) {
-                categorized.add(new CategorizedTransaction(resultItem.movementId(), resultItem.transaction(), resultItem.assignment()));
+                categorized.add(new CategorizedTransaction(resultItem.movementId(), resultItem.transaction(), resultItem.assignment(), resultItem.sourceReference()));
             } else if (resultItem.status() == CashflowMovementStatus.MANUAL_REVIEW) {
-                manualReview.add(new ManualReviewTransaction(resultItem.movementId(), resultItem.transaction(), resultItem.assignment()));
+                manualReview.add(new ManualReviewTransaction(resultItem.movementId(), resultItem.transaction(), resultItem.assignment(), resultItem.sourceReference()));
             } else {
-                rejected.add(new RejectedTransaction(resultItem.movementId(), resultItem.transaction(), resultItem.reasonCode()));
+                rejected.add(new RejectedTransaction(resultItem.movementId(), resultItem.transaction(), resultItem.reasonCode(), resultItem.sourceReference()));
             }
         }
 
@@ -137,9 +137,13 @@ public final class CashflowIngestionService {
         }
     }
 
-    public record CategorizedTransaction(UUID movementId, Transaction transaction, CategoryAssignment assignment) {
+    public record CategorizedTransaction(UUID movementId, Transaction transaction, CategoryAssignment assignment, String sourceReference) {
         public CategorizedTransaction(Transaction transaction, CategoryAssignment assignment) {
             this(null, transaction, assignment);
+        }
+
+        public CategorizedTransaction(UUID movementId, Transaction transaction, CategoryAssignment assignment) {
+            this(movementId, transaction, assignment, null);
         }
 
         public CategorizedTransaction {
@@ -152,9 +156,13 @@ public final class CashflowIngestionService {
         }
     }
 
-    public record ManualReviewTransaction(UUID movementId, Transaction transaction, CategoryAssignment assignment) {
+    public record ManualReviewTransaction(UUID movementId, Transaction transaction, CategoryAssignment assignment, String sourceReference) {
         public ManualReviewTransaction(Transaction transaction, CategoryAssignment assignment) {
             this(null, transaction, assignment);
+        }
+
+        public ManualReviewTransaction(UUID movementId, Transaction transaction, CategoryAssignment assignment) {
+            this(movementId, transaction, assignment, null);
         }
 
         public ManualReviewTransaction {
@@ -167,9 +175,13 @@ public final class CashflowIngestionService {
         }
     }
 
-    public record RejectedTransaction(UUID movementId, Transaction transaction, String reasonCode) {
+    public record RejectedTransaction(UUID movementId, Transaction transaction, String reasonCode, String sourceReference) {
         public RejectedTransaction(Transaction transaction, String reasonCode) {
             this(null, transaction, reasonCode);
+        }
+
+        public RejectedTransaction(UUID movementId, Transaction transaction, String reasonCode) {
+            this(movementId, transaction, reasonCode, null);
         }
 
         public RejectedTransaction {
@@ -258,19 +270,21 @@ public final class CashflowIngestionService {
             CashflowMovementStatus status,
             Transaction transaction,
             CategoryAssignment assignment,
-            String reasonCode
+            String reasonCode,
+            String sourceReference
     ) {
         static ResultItem saved(IngestionOutcome outcome, CashflowMovementRecord record) {
-            return new ResultItem(record.id(), outcome.status(), outcome.transaction(), outcome.assignment(), outcome.reasonCode());
+            return new ResultItem(record.id(), outcome.status(), outcome.transaction(), outcome.assignment(), outcome.reasonCode(), outcome.draft().sourceReference());
         }
 
-        static ResultItem existing(CashflowMovementRecord record, Transaction fallbackTransaction, VerticalProfile profile) {
+        static ResultItem existing(CashflowMovementRecord record, Transaction fallbackTransaction, VerticalProfile profile, String sourceReference) {
             return new ResultItem(
                     record.id(),
                     record.status(),
                     transactionFrom(record, fallbackTransaction),
                     assignmentFrom(record, profile),
-                    record.rejectionReasonCode()
+                    record.rejectionReasonCode(),
+                    sourceReference
             );
         }
 

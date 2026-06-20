@@ -9,9 +9,11 @@ import com.kuroneko.pymeflow.application.cashflow.CashflowIngestionService;
 import com.kuroneko.pymeflow.application.cashflow.SensitiveDataPolicy;
 import com.kuroneko.pymeflow.application.port.out.CashflowCategorizationPort;
 import com.kuroneko.pymeflow.application.port.out.CashflowMovementHistoryPort;
+import com.kuroneko.pymeflow.application.port.out.ExternalStatementImportPort;
 import com.kuroneko.pymeflow.application.port.out.ProfileRegistryPort;
 import com.kuroneko.pymeflow.application.recommendation.HistoryRecommendationService;
 import com.kuroneko.pymeflow.application.vertical.VerticalProfileService;
+import com.kuroneko.pymeflow.infrastructure.bank.SimulatedBankStatementAdapter;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnBean;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -80,5 +82,10 @@ public class ApplicationServiceConfiguration {
     @Bean
     SensitiveDataPolicy sensitiveDataPolicy(VerticalProfileProperties properties) {
         return new SensitiveDataPolicy(properties.sensitiveIdentifiers());
+    }
+
+    @Bean
+    ExternalStatementImportPort externalStatementImportPort(CashflowIngestionService cashflowIngestionService) {
+        return new SimulatedBankStatementAdapter(cashflowIngestionService);
     }
 }

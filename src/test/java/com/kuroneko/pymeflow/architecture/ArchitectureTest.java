@@ -42,6 +42,14 @@ class ArchitectureTest {
     }
 
     @Test
+    void domainAndApplicationDoNotDependOnBankSpecificInfrastructure() {
+        noClasses()
+                .that().resideInAnyPackage("..domain..", "..application..")
+                .should().dependOnClassesThat().resideInAPackage("..infrastructure.bank..")
+                .check(MAIN_CLASSES);
+    }
+
+    @Test
     void domainAndApplicationDoNotHardcodeVerticalProviderOrBankLiterals() throws IOException {
         var forbiddenLiterals = Pattern.compile(
                 "(?i).*(pharmacy-cl|farmacia|pharmacy|banco|bank|acquirer|adquirente|getnet|tuu|transbank).*"
