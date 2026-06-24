@@ -7,9 +7,10 @@ import com.kuroneko.pymeflow.application.port.out.BankProviderPort;
 import com.kuroneko.pymeflow.application.port.out.ExternalStatementImportPort;
 import com.kuroneko.pymeflow.application.port.out.SyncSessionPort;
 import com.kuroneko.pymeflow.infrastructure.bank.SimulatedBankStatementAdapter;
+import com.kuroneko.pymeflow.infrastructure.persistence.JdbcSyncSessionAdapter;
 import com.kuroneko.pymeflow.infrastructure.provider.FakeBankProviderAdapter;
-import com.kuroneko.pymeflow.infrastructure.provider.InMemorySyncSessionAdapter;
 import org.junit.jupiter.api.Test;
+import org.springframework.jdbc.core.JdbcTemplate;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.mock;
@@ -26,10 +27,10 @@ class ApplicationServiceConfigurationTest {
     }
 
     @Test
-    void wiresProviderSyncServiceWithInMemorySessionAdapter() {
+    void wiresProviderSyncServiceWithJdbcSessionAdapter() {
         var configuration = new ApplicationServiceConfiguration();
 
-        SyncSessionPort sessionPort = configuration.syncSessionPort();
+        SyncSessionPort sessionPort = configuration.syncSessionPort(mock(JdbcTemplate.class));
         ProviderSyncUseCase useCase = configuration.providerSyncUseCase(
                 mock(BankProviderPort.class),
                 mock(ExternalStatementImportPort.class),
@@ -37,7 +38,7 @@ class ApplicationServiceConfigurationTest {
                 new ProviderAuthConfig(3, 25)
         );
 
-        assertThat(sessionPort).isInstanceOf(InMemorySyncSessionAdapter.class);
+        assertThat(sessionPort).isInstanceOf(JdbcSyncSessionAdapter.class);
         assertThat(useCase).isInstanceOf(ProviderSyncUseCase.ProviderSyncService.class);
     }
 

@@ -86,25 +86,47 @@ The system MUST provide `ProviderSyncUseCase` that orchestrates fetch → import
 
 ### Requirement: Sync Session Traceability
 
-The system MUST track sync sessions behind `SyncSessionPort` with `syncId`, cursor state, `lastSyncAt`, entry counts, provider errors, and a safe in-memory status snapshot retrievable by `syncId` for the current process only.
+The system MUST track sync sessions behind `SyncSessionPort` with `syncId`, cursor state, `lastSyncAt`, entry counts, provider errors, and a safe durable status snapshot retrievable by `syncId` across application restarts.
 
 #### Scenario: Session updated after each page
 
 - GIVEN a successful page fetch
 - WHEN the page is imported
-- THEN the sync session stores the next cursor and increments counts
+- THEN the sync session stores the next cursor and increments counts durably
 
 #### Scenario: Session available for resume
 
-- GIVEN a previous sync stored a cursor
-- WHEN a new sync starts for the same profile and provider
+- GIVEN a previous sync stored a cursor for the same profile and provider
+- WHEN a new sync starts after adapter or application restart
 - THEN the previous cursor is used to resume pagination
 
-#### Scenario: Session status is non-durable
+#### Scenario: Session status is durable
 
-- GIVEN a sync status exists only in memory
-- WHEN the application process restarts
-- THEN status lookup for the previous `syncId` is not guaranteed
+- GIVEN a sync status was recorded before application restart
+- WHEN status is requested after restart with the same `syncId`
+- THEN the stored snapshot is returned with persistent durability semantics
+
+#### Scenario: Entry counts avoid lost updates
+
+- GIVEN multiple page imports update the same sync session
+- WHEN counts are recorded separately from cursor updates
+- THEN the final durable count MUST include all imported entries
+
+### Requirement: Durable Session Storage Migration
+
+The system MUST provision durable provider sync session storage before the application uses the JDBC-backed session adapter.
+
+#### Scenario: Migration creates durable session storage
+
+- GIVEN the application database starts with provider sync migrations enabled
+- WHEN migrations run successfully
+- THEN storage exists for sync id, profile/provider identity, status, cursor, counts, timestamps, durability, and safe errors
+
+#### Scenario: Migration failure prevents false durability
+
+- GIVEN provider sync session storage cannot be migrated
+- WHEN the application attempts to start durable provider sync support
+- THEN startup or sync wiring MUST fail safely rather than reporting durable status from incomplete storage
 
 ### Requirement: Provider Sync Trigger API
 
@@ -120,7 +142,7 @@ The system MUST expose a synchronous fixture-backed trigger endpoint at `POST /a
 
 - GIVEN a valid trigger request for the fixture provider
 - WHEN the client posts to `/api/cashflow/provider-syncs`
-- THEN the response contains `syncId`, counts, cursor/session metadata, provider type, and completion flags
+- THEN the response contains `syncId`, counts, cursor/session metadata, provider type, completion flags, and durable/persistent durability
 - AND no credential material is present
 
 #### Scenario: Invalid trigger request is rejected safely
@@ -132,23 +154,23 @@ The system MUST expose a synchronous fixture-backed trigger endpoint at `POST /a
 
 ### Requirement: Provider Sync Status API
 
-The system MUST expose `GET /api/cashflow/provider-syncs/{syncId}` to inspect the last safe in-memory status snapshot for a sync.
+The system MUST expose `GET /api/cashflow/provider-syncs/{syncId}` to inspect the last safe durable status snapshot for a sync.
 
 #### Scenario: Status lookup returns last snapshot
 
-- GIVEN a sync has completed in the current process
+- GIVEN a sync has completed and its session was persisted
 - WHEN the client requests its `syncId`
-- THEN the response contains status, counts, cursor/session metadata, provider errors, and retry hints
+- THEN the response contains status, counts, cursor/session metadata, provider errors, retry hints, and durable/persistent durability
 
-#### Scenario: Unknown or expired status returns safe not found
+#### Scenario: Unknown status returns safe not found
 
-- GIVEN the `syncId` is unknown or lost after process restart
+- GIVEN the `syncId` has never been recorded or durable storage has no matching session
 - WHEN the client requests status
-- THEN the API returns a safe not-found response explaining the in-memory MVP limitation
+- THEN the API returns a safe not-found response without implying an in-memory restart limitation
 
 ### Requirement: Safe Provider Error DTOs
 
-The system MUST map provider failures to stable API DTOs containing only safe `code`, `message`, `field`, and `retryAfterSeconds` values where applicable.
+The system MUST map and persist provider failures to stable API DTOs containing only safe `code`, `message`, `field`, and `retryAfterSeconds` values where applicable.
 
 #### Scenario: Provider failure hides internals
 
@@ -156,6 +178,12 @@ The system MUST map provider failures to stable API DTOs containing only safe `c
 - WHEN the API returns the trigger report or status
 - THEN errors are normalized to safe DTO fields
 - AND provider internals and credentials are not exposed
+
+#### Scenario: Persisted errors remain safe after restart
+
+- GIVEN a sync records provider errors before application restart
+- WHEN status is requested after restart
+- THEN the returned errors contain only safe DTO fields and no raw credentials, provider payloads, stack traces, or internal exception details
 
 ### Requirement: Fixture-Backed Adapter Validation
 

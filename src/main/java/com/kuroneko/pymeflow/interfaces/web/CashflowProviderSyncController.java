@@ -35,7 +35,7 @@ import java.util.Set;
 @RequestMapping("/api/cashflow/provider-syncs")
 @Tag(name = "Cashflow provider sync")
 public class CashflowProviderSyncController {
-    private static final String IN_MEMORY = "IN_MEMORY";
+    private static final String DURABLE = "DURABLE";
     private static final Set<String> SUPPORTED_FIXTURE_PROVIDERS = Set.of("santander", "bancoestado");
 
     private final ProviderSyncUseCase providerSyncUseCase;
@@ -54,7 +54,7 @@ public class CashflowProviderSyncController {
             summary = "Trigger fixture-backed provider sync",
             description = "Runs a synchronous fixture-backed provider sync. The API accepts only safe references "
                     + "and does not accept raw credentials, secrets, passwords, or tokens. Status snapshots are "
-                    + "non-durable and kept in memory for this MVP."
+                    + "durable and stored for status lookup and restart-safe inspection."
     )
     @ApiResponses({
             @ApiResponse(responseCode = "200", description = "Sync completed synchronously with a safe report."),
@@ -89,20 +89,20 @@ public class CashflowProviderSyncController {
     @GetMapping("/{syncId}")
     @Operation(
             summary = "Read provider sync status",
-            description = "Returns the last safe in-memory status snapshot for a syncId. Unknown values can mean "
-                    + "the id never existed or the process restarted because MVP status is non-durable."
+            description = "Returns the last safe durable status snapshot for a syncId. Unknown values mean durable "
+                    + "storage has no matching recorded session."
     )
     @ApiResponses({
-            @ApiResponse(responseCode = "200", description = "In-memory status snapshot found."),
-            @ApiResponse(responseCode = "404", description = "No in-memory status snapshot was found for this syncId.")
+            @ApiResponse(responseCode = "200", description = "Durable status snapshot found."),
+            @ApiResponse(responseCode = "404", description = "No durable status snapshot was found for this syncId.")
     })
     public ResponseEntity<?> status(@PathVariable String syncId) {
         return providerSyncStatusUseCase.find(syncId)
                 .<ResponseEntity<?>>map(snapshot -> ResponseEntity.ok(fromSnapshot(snapshot)))
                 .orElseGet(() -> ResponseEntity.status(HttpStatus.NOT_FOUND).body(new SyncStatusNotFoundResponse(
                         "SYNC_STATUS_NOT_FOUND",
-                        "No in-memory status snapshot was found for this syncId.",
-                        IN_MEMORY
+                        "No durable status snapshot was found for this syncId.",
+                        DURABLE
                 )));
     }
 
@@ -190,7 +190,7 @@ public class CashflowProviderSyncController {
                 report.entriesFetched(),
                 report.errors().stream().map(CashflowProviderSyncController::fromProviderError).toList(),
                 report.retryAfterSeconds(),
-                IN_MEMORY
+                DURABLE
         );
     }
 

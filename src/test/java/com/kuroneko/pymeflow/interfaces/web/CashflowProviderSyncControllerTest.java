@@ -53,7 +53,7 @@ class CashflowProviderSyncControllerTest {
     private MockMvc mockMvc;
 
     @Test
-    void postTriggersSyncAndReturnsSafeReportWithoutCredentialEcho() throws Exception {
+    void postTriggersSyncAndReturnsSafeDurableReportWithoutCredentialEcho() throws Exception {
         when(providerSyncUseCase.sync(any())).thenReturn(new ProviderSyncUseCase.ProviderSyncReport(
                 "sync-santander-001",
                 2,
@@ -81,7 +81,7 @@ class CashflowProviderSyncControllerTest {
                 .andExpect(jsonPath("$.truncated").value(false))
                 .andExpect(jsonPath("$.authAborted").value(false))
                 .andExpect(jsonPath("$.sessionEntryCount").value(4))
-                .andExpect(jsonPath("$.durability").value("IN_MEMORY"))
+                .andExpect(jsonPath("$.durability").value("DURABLE"))
                 .andExpect(jsonPath("$.errors").isEmpty())
                 .andExpect(content().string(not(containsString("credentialRef"))))
                 .andExpect(content().string(not(containsString("fixture-ref-safe"))));
@@ -137,7 +137,7 @@ class CashflowProviderSyncControllerTest {
     }
 
     @Test
-    void getReturnsLastInMemoryStatusSnapshotWithNormalizedProviderErrors() throws Exception {
+    void getReturnsLastDurableStatusSnapshotWithNormalizedProviderErrors() throws Exception {
         var snapshot = new SyncSessionPort.SyncSessionSnapshot(
                 "sync-rate-limited-001",
                 new ProfileId("pharmacy-cl"),
@@ -154,7 +154,7 @@ class CashflowProviderSyncControllerTest {
                 5,
                 List.of(new ProviderError.RateLimitError(120, "Request limit reached")),
                 Optional.of(120),
-                SyncSessionPort.Durability.IN_MEMORY
+                SyncSessionPort.Durability.DURABLE
         );
         when(providerSyncStatusUseCase.find("sync-rate-limited-001")).thenReturn(Optional.of(snapshot));
 
@@ -171,18 +171,60 @@ class CashflowProviderSyncControllerTest {
                 .andExpect(jsonPath("$.errors[0].code").value("RATE_LIMIT"))
                 .andExpect(jsonPath("$.errors[0].message").value("Request limit reached"))
                 .andExpect(jsonPath("$.errors[0].retryAfterSeconds").value(120))
-                .andExpect(jsonPath("$.durability").value("IN_MEMORY"));
+                .andExpect(jsonPath("$.durability").value("DURABLE"));
     }
 
     @Test
-    void getUnknownSyncIdReturnsSafeNonDurableNotFound() throws Exception {
+    void getUnknownSyncIdReturnsSafeDurableNotFound() throws Exception {
         when(providerSyncStatusUseCase.find("sync-missing-001")).thenReturn(Optional.empty());
 
         mockMvc.perform(get(ENDPOINT + "/sync-missing-001"))
                 .andExpect(status().isNotFound())
                 .andExpect(jsonPath("$.code").value("SYNC_STATUS_NOT_FOUND"))
-                .andExpect(jsonPath("$.message").value("No in-memory status snapshot was found for this syncId."))
-                .andExpect(jsonPath("$.durability").value("IN_MEMORY"));
+                .andExpect(jsonPath("$.message").value("No durable status snapshot was found for this syncId."))
+                .andExpect(jsonPath("$.durability").value("DURABLE"));
+    }
+
+    @Test
+    void getPersistedStatusReturnsOnlySafeProviderErrorFields() throws Exception {
+        var snapshot = new SyncSessionPort.SyncSessionSnapshot(
+                "sync-safe-errors-001",
+                new ProfileId("pharmacy-cl"),
+                "santander",
+                SyncSessionPort.SyncStatus.FAILED,
+                0,
+                0,
+                0,
+                false,
+                false,
+                true,
+                Optional.empty(),
+                Optional.of(Instant.parse("2026-06-23T10:15:30Z")),
+                0,
+                List.of(
+                        new ProviderError.AuthError("Credential rejected"),
+                        new ProviderError.DataError("amount", "Statement amount is invalid")
+                ),
+                Optional.empty(),
+                SyncSessionPort.Durability.DURABLE
+        );
+        when(providerSyncStatusUseCase.find("sync-safe-errors-001")).thenReturn(Optional.of(snapshot));
+
+        mockMvc.perform(get(ENDPOINT + "/sync-safe-errors-001"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.durability").value("DURABLE"))
+                .andExpect(jsonPath("$.errors[0].code").value("AUTH_ERROR"))
+                .andExpect(jsonPath("$.errors[0].message").value("Credential rejected"))
+                .andExpect(jsonPath("$.errors[1].code").value("DATA_ERROR"))
+                .andExpect(jsonPath("$.errors[1].field").value("amount"))
+                .andExpect(jsonPath("$.errors[1].message").value("Statement amount is invalid"))
+                .andExpect(content().string(not(containsString("credentialRef"))))
+                .andExpect(content().string(not(containsString("fixture-ref"))))
+                .andExpect(content().string(not(containsString("password"))))
+                .andExpect(content().string(not(containsString("token"))))
+                .andExpect(content().string(not(containsString("Exception"))))
+                .andExpect(content().string(not(containsString("stackTrace"))))
+                .andExpect(content().string(not(containsString("rawPayload"))));
     }
 
     @Test
@@ -231,7 +273,11 @@ class CashflowProviderSyncControllerTest {
 
         assertThat(postOperation.description())
                 .contains("fixture-backed")
-                .contains("does not accept raw credentials");
+                .contains("does not accept raw credentials")
+                .contains("durable");
+        assertThat(getEndpoint.getAnnotation(Operation.class).description())
+                .contains("last safe durable status snapshot")
+                .doesNotContain("in-memory", "process restarted", "non-durable");
         assertThat(postResponses).extracting(response -> response.responseCode()).contains("200", "400");
         assertThat(getResponses).extracting(response -> response.responseCode()).contains("200", "404");
         assertThat(payload.path("credentialRef").asText()).isEqualTo("fixture-ref-santander");

@@ -30,7 +30,8 @@ public interface SyncSessionPort {
     }
 
     enum Durability {
-        IN_MEMORY
+        IN_MEMORY,
+        DURABLE
     }
 
     record SyncSessionSnapshot(

@@ -18,11 +18,12 @@ import com.kuroneko.pymeflow.application.port.out.SyncSessionPort;
 import com.kuroneko.pymeflow.application.recommendation.HistoryRecommendationService;
 import com.kuroneko.pymeflow.application.vertical.VerticalProfileService;
 import com.kuroneko.pymeflow.infrastructure.bank.SimulatedBankStatementAdapter;
+import com.kuroneko.pymeflow.infrastructure.persistence.JdbcSyncSessionAdapter;
 import com.kuroneko.pymeflow.infrastructure.provider.FakeBankProviderAdapter;
-import com.kuroneko.pymeflow.infrastructure.provider.InMemorySyncSessionAdapter;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnBean;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.jdbc.core.JdbcTemplate;
 
 @Configuration
 public class ApplicationServiceConfiguration {
@@ -99,8 +100,8 @@ public class ApplicationServiceConfiguration {
     }
 
     @Bean
-    SyncSessionPort syncSessionPort() {
-        return new InMemorySyncSessionAdapter();
+    SyncSessionPort syncSessionPort(JdbcTemplate jdbcTemplate) {
+        return new JdbcSyncSessionAdapter(jdbcTemplate);
     }
 
     @Bean
