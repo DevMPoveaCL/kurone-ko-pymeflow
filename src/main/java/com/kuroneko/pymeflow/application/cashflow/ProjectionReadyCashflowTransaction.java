@@ -1,5 +1,7 @@
 package com.kuroneko.pymeflow.application.cashflow;
 
+import com.kuroneko.pymeflow.domain.cashflow.TransactionDirection;
+
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.Currency;
@@ -11,8 +13,20 @@ public record ProjectionReadyCashflowTransaction(
         BigDecimal amount,
         Currency currency,
         LocalDate date,
+        TransactionDirection direction,
         CashflowMovementStatus status
 ) {
+    public ProjectionReadyCashflowTransaction(
+            UUID movementId,
+            String categoryKey,
+            BigDecimal amount,
+            Currency currency,
+            LocalDate date,
+            CashflowMovementStatus status
+    ) {
+        this(movementId, categoryKey, amount, currency, date, TransactionDirection.CREDIT, status);
+    }
+
     public ProjectionReadyCashflowTransaction {
         if (movementId == null) {
             throw new IllegalArgumentException("Movement id is required");
@@ -29,13 +43,16 @@ public record ProjectionReadyCashflowTransaction(
         if (date == null) {
             throw new IllegalArgumentException("Date is required");
         }
+        if (direction == null) {
+            throw new IllegalArgumentException("Direction is required");
+        }
         if (status != CashflowMovementStatus.PROJECTABLE) {
             throw new IllegalArgumentException("Projection-ready transaction must be projectable");
         }
     }
 
     public ProjectedCashflowTransaction toProjectionTransaction() {
-        return new ProjectedCashflowTransaction(categoryKey, amount, currency, date);
+        return new ProjectedCashflowTransaction(categoryKey, amount, currency, date, direction);
     }
 
     static ProjectionReadyCashflowTransaction from(CashflowMovementRecord record) {
@@ -45,6 +62,7 @@ public record ProjectionReadyCashflowTransaction(
                 record.amount(),
                 record.currency(),
                 record.date(),
+                record.direction(),
                 record.status()
         );
     }

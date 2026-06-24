@@ -7,6 +7,7 @@ import com.kuroneko.pymeflow.application.cashflow.ManualReviewResolutionService;
 import com.kuroneko.pymeflow.application.cashflow.PersistedManualReviewResolutionResult;
 import com.kuroneko.pymeflow.application.cashflow.ProjectionReadyCashflowTransaction;
 import com.kuroneko.pymeflow.application.cashflow.ProjectedCashflowTransaction;
+import com.kuroneko.pymeflow.domain.cashflow.TransactionDirection;
 import com.kuroneko.pymeflow.domain.vertical.CashflowCategory;
 import com.kuroneko.pymeflow.domain.vertical.CashflowDirection;
 import org.junit.jupiter.api.Test;
@@ -62,6 +63,7 @@ class ManualReviewResolutionControllerTest {
                 .andExpect(jsonPath("$.transaction.amount").value(125000))
                 .andExpect(jsonPath("$.transaction.currency").value("CLP"))
                 .andExpect(jsonPath("$.transaction.date").value("2026-06-11"))
+                .andExpect(jsonPath("$.transaction.movementDirection").value("DEBIT"))
                 .andExpect(jsonPath("$.transaction.status").value("PROJECTABLE"))
                 .andExpect(jsonPath("$.category.key").value("sales"))
                 .andExpect(jsonPath("$.category.displayName").value("Ventas"))
@@ -202,6 +204,7 @@ class ManualReviewResolutionControllerTest {
                 .andExpect(jsonPath("$.transaction.amount").value(125000))
                 .andExpect(jsonPath("$.transaction.currency").value("CLP"))
                 .andExpect(jsonPath("$.transaction.date").value("2026-06-11"))
+                .andExpect(jsonPath("$.transaction.movementDirection").value("CREDIT"))
                 .andExpect(jsonPath("$.transaction.status").value("PROJECTABLE"))
                 .andExpect(jsonPath("$.category.key").value("sales"))
                 .andExpect(jsonPath("$.description").value("Venta Caja 1"))
@@ -258,7 +261,8 @@ class ManualReviewResolutionControllerTest {
                         "sales",
                         BigDecimal.valueOf(125000),
                         Currency.getInstance("CLP"),
-                        LocalDate.of(2026, 6, 11)
+                        LocalDate.of(2026, 6, 11),
+                        TransactionDirection.DEBIT
                 ),
                 new CashflowCategory("sales", "Ventas", CashflowDirection.INFLOW),
                 description,
@@ -279,6 +283,7 @@ class ManualReviewResolutionControllerTest {
                         BigDecimal.valueOf(125000),
                         Currency.getInstance("CLP"),
                         LocalDate.of(2026, 6, 11),
+                        TransactionDirection.CREDIT,
                         CashflowMovementStatus.PROJECTABLE
                 ),
                 new CashflowCategory("sales", "Ventas", CashflowDirection.INFLOW),

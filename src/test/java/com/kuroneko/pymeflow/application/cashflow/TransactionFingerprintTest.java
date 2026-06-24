@@ -1,6 +1,7 @@
 package com.kuroneko.pymeflow.application.cashflow;
 
 import com.kuroneko.pymeflow.domain.cashflow.Transaction;
+import com.kuroneko.pymeflow.domain.cashflow.TransactionDirection;
 import com.kuroneko.pymeflow.domain.vertical.ProfileId;
 import org.junit.jupiter.api.Test;
 
@@ -82,12 +83,30 @@ class TransactionFingerprintTest {
                 .isNotEqualTo(differentProfile);
     }
 
+    @Test
+    void excludesTransactionDirectionFromVersionOneFingerprint() {
+        var profileId = new ProfileId("p1");
+        var debit = transaction("Pago", "1000.00", TransactionDirection.DEBIT);
+        var credit = transaction("Pago", "1000.00", TransactionDirection.CREDIT);
+
+        var debitFingerprint = TransactionFingerprint.compute(profileId, debit);
+        var creditFingerprint = TransactionFingerprint.compute(profileId, credit);
+
+        assertThat(debitFingerprint).isEqualTo(creditFingerprint);
+        assertThat(debitFingerprint).startsWith("fp:v1:");
+    }
+
     private static Transaction transaction(String description, String amount) {
+        return transaction(description, amount, TransactionDirection.CREDIT);
+    }
+
+    private static Transaction transaction(String description, String amount, TransactionDirection direction) {
         return new Transaction(
                 description,
                 amount(amount),
                 Currency.getInstance("CLP"),
-                LocalDate.of(2024, 6, 18)
+                LocalDate.of(2024, 6, 18),
+                direction
         );
     }
 

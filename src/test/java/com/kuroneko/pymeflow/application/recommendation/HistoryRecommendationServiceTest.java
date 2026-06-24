@@ -6,6 +6,7 @@ import com.kuroneko.pymeflow.application.cashflow.CashflowMovementStatus;
 import com.kuroneko.pymeflow.application.cashflow.ManualReviewMovementResolutionCommand;
 import com.kuroneko.pymeflow.application.port.out.CashflowMovementHistoryPort;
 import com.kuroneko.pymeflow.application.vertical.VerticalProfileService;
+import com.kuroneko.pymeflow.domain.cashflow.TransactionDirection;
 import com.kuroneko.pymeflow.domain.vertical.CashflowCategory;
 import com.kuroneko.pymeflow.domain.vertical.CashflowDirection;
 import com.kuroneko.pymeflow.domain.vertical.ProfileId;
@@ -200,6 +201,37 @@ class HistoryRecommendationServiceTest {
     }
 
     @Test
+    void generatesDirectionMismatchInfoUsingAggregateCountsOnly() {
+        var response = service(new FakeCashflowMovementHistoryPort()
+                .withProjectable(projectable("sales", 100, LocalDate.of(2026, 6, 10), TransactionDirection.DEBIT), 2)
+                .withProjectable(projectable("expenses", 200, LocalDate.of(2026, 6, 11), TransactionDirection.CREDIT), 3)
+                .withProjectable(projectable("sales", 100, LocalDate.of(2026, 6, 12), TransactionDirection.CREDIT), 5))
+                .generate(PROFILE_ID);
+
+        var signal = signal(response, "DIRECTION_MISMATCH");
+
+        assertThat(signal.severity()).isEqualTo("INFO");
+        assertThat(signal.title()).isEqualTo("Diferencia entre movimiento y categoría");
+        assertThat(signal.actionHint()).isEqualTo("Revisa si la categoría asignada refleja correctamente el movimiento bancario.");
+        assertThat(signal.metrics()).containsOnly(
+                Map.entry("debitInflowCount", 2L),
+                Map.entry("creditOutflowCount", 3L)
+        );
+        assertThat(signal.toString()).doesNotContain("Ingreso registrado", "bank-file", "sales", "expenses");
+    }
+
+    @Test
+    void omitsDirectionMismatchSignalWhenMovementAndCategoryDirectionsAreAligned() {
+        var response = service(new FakeCashflowMovementHistoryPort()
+                .withProjectable(projectable("sales", 100, LocalDate.of(2026, 6, 10), TransactionDirection.CREDIT), 5)
+                .withProjectable(projectable("expenses", 100, LocalDate.of(2026, 6, 11), TransactionDirection.DEBIT), 5))
+                .generate(PROFILE_ID);
+
+        assertThat(signalTypes(response)).doesNotContain("DIRECTION_MISMATCH");
+        assertThat(signalTypes(response)).containsExactly("HEALTHY_HISTORY");
+    }
+
+    @Test
     void ordersWarningsBeforeInformationWithStableOrderInsideSeverity() {
         var response = service(new FakeCashflowMovementHistoryPort()
                 .withManualReviews(6, LocalDate.of(2026, 5, 1))
@@ -280,13 +312,26 @@ class HistoryRecommendationServiceTest {
                 PROFILE_ID,
                 "Farmacia",
                 List.of(),
-                List.of(new CashflowCategory("sales", "Ventas", CashflowDirection.INFLOW)),
+                List.of(
+                        new CashflowCategory("sales", "Ventas", CashflowDirection.INFLOW),
+                        new CashflowCategory("supplies", "Insumos", CashflowDirection.INFLOW),
+                        new CashflowCategory("expenses", "Gastos", CashflowDirection.OUTFLOW)
+                ),
                 List.of()
         );
     }
 
     private static CashflowMovementRecord projectable(String categoryKey, int amount, LocalDate date) {
         return movement(CashflowMovementStatus.PROJECTABLE, categoryKey, amount, date, "Ingreso registrado", "bank-file", null);
+    }
+
+    private static CashflowMovementRecord projectable(
+            String categoryKey,
+            int amount,
+            LocalDate date,
+            TransactionDirection direction
+    ) {
+        return movement(CashflowMovementStatus.PROJECTABLE, categoryKey, amount, date, direction, "Ingreso registrado", "bank-file", null);
     }
 
     private static CashflowMovementRecord movement(
@@ -298,6 +343,19 @@ class HistoryRecommendationServiceTest {
             String sourceReference,
             String rejectionReasonCode
     ) {
+        return movement(status, categoryKey, amount, date, TransactionDirection.CREDIT, safeDescription, sourceReference, rejectionReasonCode);
+    }
+
+    private static CashflowMovementRecord movement(
+            CashflowMovementStatus status,
+            String categoryKey,
+            int amount,
+            LocalDate date,
+            TransactionDirection direction,
+            String safeDescription,
+            String sourceReference,
+            String rejectionReasonCode
+    ) {
         var now = FIXED_CLOCK.instant();
         return new CashflowMovementRecord(
                 UUID.randomUUID(),
@@ -305,6 +363,7 @@ class HistoryRecommendationServiceTest {
                 BigDecimal.valueOf(amount),
                 CLP,
                 date,
+                direction,
                 status,
                 categoryKey,
                 safeDescription,

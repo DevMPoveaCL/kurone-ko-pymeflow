@@ -6,6 +6,7 @@ import com.kuroneko.pymeflow.application.port.out.ExternalStatementImportCommand
 import com.kuroneko.pymeflow.application.port.out.ExternalStatementImportPort;
 import com.kuroneko.pymeflow.domain.cashflow.CategoryAssignment;
 import com.kuroneko.pymeflow.domain.cashflow.Transaction;
+import com.kuroneko.pymeflow.domain.cashflow.TransactionDirection;
 import com.kuroneko.pymeflow.domain.vertical.CashflowCategory;
 import com.kuroneko.pymeflow.domain.vertical.CashflowDirection;
 import io.swagger.v3.oas.annotations.Operation;
@@ -76,7 +77,8 @@ class CashflowBankStatementSimulatedControllerTest {
                 .andExpect(jsonPath("$.rejectedCount").value(0))
                 .andExpect(jsonPath("$.invalid").value(0))
                 .andExpect(jsonPath("$.categorized[0].movementId").value("11111111-1111-1111-1111-111111111111"))
-                .andExpect(jsonPath("$.categorized[0].row").value(1));
+                .andExpect(jsonPath("$.categorized[0].row").value(1))
+                .andExpect(jsonPath("$.categorized[0].transaction.movementDirection").value("CREDIT"));
     }
 
     @Test
@@ -372,7 +374,49 @@ class CashflowBankStatementSimulatedControllerTest {
     }
 
     @Test
-    void documentsOpenApiResponsesAndDirectionLossTradeoff() throws Exception {
+    void responseEntriesExposeMovementDirectionForAllResultPartitions() throws Exception {
+        var category = new CashflowCategory("sales", "Ventas", CashflowDirection.INFLOW);
+        when(externalStatementImportPort.importStatement(any())).thenReturn(new CashflowIngestionService.CashflowIngestionResult(
+                List.of(new CashflowIngestionService.CategorizedTransaction(
+                        UUID.fromString("22222222-2222-2222-2222-222222222222"),
+                        transaction("Venta POS", 22000, TransactionDirection.CREDIT),
+                        new CategoryAssignment(Optional.of(category), false),
+                        "BT-202"
+                )),
+                List.of(new CashflowIngestionService.ManualReviewTransaction(
+                        UUID.fromString("44444444-4444-4444-4444-444444444444"),
+                        transaction("Compra insumo", 44000, TransactionDirection.DEBIT),
+                        new CategoryAssignment(Optional.empty(), true),
+                        "BT-204"
+                )),
+                List.of(new CashflowIngestionService.RejectedTransaction(
+                        UUID.fromString("11111111-1111-1111-1111-111111111111"),
+                        transaction("Dato sensible", 11000, TransactionDirection.DEBIT),
+                        "SENSITIVE_IDENTIFIER_REJECTED",
+                        "BT-201"
+                ))
+        ));
+
+        mockMvc.perform(post(ENDPOINT)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "profileId": "pharmacy-cl",
+                                  "rows": [
+                                    {"bankTransactionId": "BT-201", "bookingDate": "2026-06-15", "description": "Dato sensible", "amount": -11000, "currency": "CLP", "accountAlias": "Cuenta corriente"},
+                                    {"bankTransactionId": "BT-202", "bookingDate": "2026-06-15", "description": "Venta POS", "amount": 22000, "currency": "CLP", "accountAlias": "Cuenta corriente"},
+                                    {"bankTransactionId": "BT-204", "bookingDate": "2026-06-15", "description": "Compra insumo", "amount": -44000, "currency": "CLP", "accountAlias": "Cuenta corriente"}
+                                  ]
+                                }
+                                """))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.categorized[0].transaction.movementDirection").value("CREDIT"))
+                .andExpect(jsonPath("$.manualReview[0].transaction.movementDirection").value("DEBIT"))
+                .andExpect(jsonPath("$.rejected[0].movementDirection").value("DEBIT"));
+    }
+
+    @Test
+    void documentsOpenApiResponsesAndDirectionPreservation() throws Exception {
         Method endpoint = CashflowBankStatementSimulatedController.class.getMethod(
                 "importSimulated",
                 CashflowBankStatementSimulatedController.SimulatedBankStatementRequest.class
@@ -385,8 +429,8 @@ class CashflowBankStatementSimulatedControllerTest {
                 .extracting(response -> response.responseCode())
                 .contains("200", "400");
         assertThat(operation.description())
-                .contains("los montos con signo se convierten a valores positivos")
-                .contains("se pierde la distinción débito/crédito");
+                .contains("Los montos con signo se normalizan a valores positivos")
+                .contains("la dirección del movimiento se conserva como DEBIT o CREDIT");
     }
 
     private static CashflowIngestionService.CashflowIngestionResult emptyIngestionResult() {
@@ -434,11 +478,16 @@ class CashflowBankStatementSimulatedControllerTest {
     }
 
     private static Transaction transaction(String description, int amount) {
+        return transaction(description, amount, TransactionDirection.CREDIT);
+    }
+
+    private static Transaction transaction(String description, int amount, TransactionDirection direction) {
         return new Transaction(
                 description,
                 BigDecimal.valueOf(amount),
                 Currency.getInstance("CLP"),
-                LocalDate.of(2026, 6, 15)
+                LocalDate.of(2026, 6, 15),
+                direction
         );
     }
 }

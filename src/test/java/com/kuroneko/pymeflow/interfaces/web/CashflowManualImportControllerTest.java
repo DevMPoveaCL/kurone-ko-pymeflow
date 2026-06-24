@@ -3,6 +3,7 @@ package com.kuroneko.pymeflow.interfaces.web;
 import com.kuroneko.pymeflow.application.cashflow.CashflowIngestionService;
 import com.kuroneko.pymeflow.domain.cashflow.CategoryAssignment;
 import com.kuroneko.pymeflow.domain.cashflow.Transaction;
+import com.kuroneko.pymeflow.domain.cashflow.TransactionDirection;
 import com.kuroneko.pymeflow.domain.vertical.CashflowCategory;
 import com.kuroneko.pymeflow.domain.vertical.CashflowDirection;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
@@ -182,6 +183,62 @@ class CashflowManualImportControllerTest {
     }
 
     @Test
+    void defaultsOmittedMovementDirectionToCreditWhenDelegatingManualRows() throws Exception {
+        when(cashflowIngestionService.ingest(any())).thenReturn(emptyIngestionResult());
+
+        mockMvc.perform(post("/api/cashflow/imports/manual")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(singleRowPayload("Venta Caja 1", "125000", "CLP", "2026-06-15", null)))
+                .andExpect(status().isOk());
+
+        var captor = forClass(CashflowIngestionService.CashflowIngestionCommand.class);
+        verify(cashflowIngestionService).ingest(captor.capture());
+        assertThat(captor.getValue().items())
+                .singleElement()
+                .satisfies(item -> assertThat(item.transaction().direction()).isEqualTo(TransactionDirection.CREDIT));
+    }
+
+    @Test
+    void acceptsExplicitDebitMovementDirectionWhenDelegatingManualRows() throws Exception {
+        when(cashflowIngestionService.ingest(any())).thenReturn(emptyIngestionResult());
+
+        mockMvc.perform(post("/api/cashflow/imports/manual")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "profileId": "pharmacy-cl",
+                                  "rows": [
+                                    {"description": "Proveedor", "amount": 125000, "currency": "CLP", "date": "2026-06-15", "movementDirection": "DEBIT"}
+                                  ]
+                                }
+                                """))
+                .andExpect(status().isOk());
+
+        var captor = forClass(CashflowIngestionService.CashflowIngestionCommand.class);
+        verify(cashflowIngestionService).ingest(captor.capture());
+        assertThat(captor.getValue().items())
+                .singleElement()
+                .satisfies(item -> assertThat(item.transaction().direction()).isEqualTo(TransactionDirection.DEBIT));
+    }
+
+    @Test
+    void rejectsInvalidMovementDirectionWithRowFieldError() throws Exception {
+        mockMvc.perform(post("/api/cashflow/imports/manual")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "profileId": "pharmacy-cl",
+                                  "rows": [
+                                    {"rowNumber": 7, "description": "Venta Caja 1", "amount": 125000, "currency": "CLP", "date": "2026-06-15", "movementDirection": "INVALID"}
+                                  ]
+                                }
+                                """))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.errors[0].row").value(7))
+                .andExpect(jsonPath("$.errors[0].field").value("movementDirection"));
+    }
+
+    @Test
     void returnsExistingMovementIdWhenReimportIsResolvedByIngestionService() throws Exception {
         var existingMovementId = UUID.fromString("55555555-5555-5555-5555-555555555555");
         var category = new CashflowCategory("sales", "Ventas", CashflowDirection.INFLOW);
@@ -293,6 +350,7 @@ class CashflowManualImportControllerTest {
                 .andExpect(jsonPath("$.manualReview[0].transaction.amount").value(88000))
                 .andExpect(jsonPath("$.manualReview[0].transaction.currency").value("CLP"))
                 .andExpect(jsonPath("$.manualReview[0].transaction.date").value("2026-06-15"))
+                .andExpect(jsonPath("$.manualReview[0].transaction.movementDirection").value("CREDIT"))
                 .andExpect(jsonPath("$.manualReview[0].reason").value("Requiere clasificación manual."));
     }
 

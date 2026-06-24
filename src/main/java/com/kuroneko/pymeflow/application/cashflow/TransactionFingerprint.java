@@ -19,6 +19,14 @@ final class TransactionFingerprint {
     private TransactionFingerprint() {
     }
 
+    /**
+     * Computes the stable {@code fp:v1} idempotency fingerprint.
+     * <p>
+     * Transaction direction is intentionally excluded from {@code fp:v1} so a
+     * movement re-imported with the same profile, amount, currency, date, and
+     * description still resolves to the same source reference after direction
+     * preservation was added.
+     */
     static String compute(ProfileId profileId, Transaction transaction) {
         return compute(
                 profileId,

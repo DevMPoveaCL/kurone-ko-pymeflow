@@ -215,6 +215,7 @@ public final class CashflowIngestionService {
                             transaction.amount(),
                             transaction.currency(),
                             transaction.bookedAt(),
+                            transaction.direction(),
                             CashflowMovementStatus.PROJECTABLE,
                             categoryKey,
                             transaction.description(),
@@ -235,6 +236,7 @@ public final class CashflowIngestionService {
                             transaction.amount(),
                             transaction.currency(),
                             transaction.bookedAt(),
+                            transaction.direction(),
                             CashflowMovementStatus.MANUAL_REVIEW,
                             null,
                             transaction.description(),
@@ -255,6 +257,7 @@ public final class CashflowIngestionService {
                             transaction.amount(),
                             transaction.currency(),
                             transaction.bookedAt(),
+                            transaction.direction(),
                             CashflowMovementStatus.REJECTED,
                             null,
                             null,
@@ -292,7 +295,7 @@ public final class CashflowIngestionService {
             var description = record.safeDescription() == null || record.safeDescription().isBlank()
                     ? fallbackTransaction.description()
                     : record.safeDescription();
-            return new Transaction(description, record.amount(), record.currency(), record.date());
+            return new Transaction(description, record.amount(), record.currency(), record.date(), record.direction());
         }
 
         private static CategoryAssignment assignmentFrom(CashflowMovementRecord record, VerticalProfile profile) {

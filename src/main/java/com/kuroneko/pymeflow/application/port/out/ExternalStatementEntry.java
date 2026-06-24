@@ -1,5 +1,7 @@
 package com.kuroneko.pymeflow.application.port.out;
 
+import com.kuroneko.pymeflow.domain.cashflow.TransactionDirection;
+
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.Currency;
@@ -10,6 +12,7 @@ public record ExternalStatementEntry(
         String description,
         BigDecimal amount,
         Currency currency,
+        TransactionDirection direction,
         String counterpartyName,
         String accountAlias
 ) {
@@ -20,7 +23,19 @@ public record ExternalStatementEntry(
             BigDecimal amount,
             Currency currency
     ) {
-        this(externalReference, date, description, amount, currency, null, null);
+        this(externalReference, date, description, amount, currency, null, null, null);
+    }
+
+    public ExternalStatementEntry(
+            String externalReference,
+            LocalDate date,
+            String description,
+            BigDecimal amount,
+            Currency currency,
+            String counterpartyName,
+            String accountAlias
+    ) {
+        this(externalReference, date, description, amount, currency, null, counterpartyName, accountAlias);
     }
 
     public ExternalStatementEntry {

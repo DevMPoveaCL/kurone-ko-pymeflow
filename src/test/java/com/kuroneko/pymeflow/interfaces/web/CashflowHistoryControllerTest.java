@@ -4,6 +4,7 @@ import com.kuroneko.pymeflow.application.cashflow.CashflowMovementHistoryService
 import com.kuroneko.pymeflow.application.cashflow.CashflowMovementStatus;
 import com.kuroneko.pymeflow.application.cashflow.PendingManualReviewMovement;
 import com.kuroneko.pymeflow.application.cashflow.ProjectionReadyCashflowTransaction;
+import com.kuroneko.pymeflow.domain.cashflow.TransactionDirection;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
@@ -47,6 +48,7 @@ class CashflowHistoryControllerTest {
                         BigDecimal.valueOf(125000),
                         CLP,
                         LocalDate.of(2026, 6, 11),
+                        TransactionDirection.DEBIT,
                         "Venta Caja 1",
                         "caja-1",
                         CashflowMovementStatus.MANUAL_REVIEW
@@ -60,6 +62,7 @@ class CashflowHistoryControllerTest {
                 .andExpect(jsonPath("$[0].amount").value(125000))
                 .andExpect(jsonPath("$[0].currency").value("CLP"))
                 .andExpect(jsonPath("$[0].date").value("2026-06-11"))
+                .andExpect(jsonPath("$[0].movementDirection").value("DEBIT"))
                 .andExpect(jsonPath("$[0].description").value("Venta Caja 1"))
                 .andExpect(jsonPath("$[0].sourceReference").value("caja-1"))
                 .andExpect(jsonPath("$[0].status").value("MANUAL_REVIEW"))
@@ -77,6 +80,7 @@ class CashflowHistoryControllerTest {
                         BigDecimal.valueOf(125000),
                         CLP,
                         LocalDate.of(2026, 6, 11),
+                        TransactionDirection.CREDIT,
                         CashflowMovementStatus.PROJECTABLE
                 )));
 
@@ -90,6 +94,7 @@ class CashflowHistoryControllerTest {
                 .andExpect(jsonPath("$[0].amount").value(125000))
                 .andExpect(jsonPath("$[0].currency").value("CLP"))
                 .andExpect(jsonPath("$[0].date").value("2026-06-11"))
+                .andExpect(jsonPath("$[0].movementDirection").value("CREDIT"))
                 .andExpect(jsonPath("$[0].status").value("PROJECTABLE"))
                 .andExpect(content().string(not(containsString("description"))))
                 .andExpect(content().string(not(containsString("sourceReference"))));

@@ -238,6 +238,7 @@ public class ManualReviewResolutionController {
             BigDecimal amount,
             String currency,
             LocalDate date,
+            String movementDirection,
             String status
     ) {
         static ProjectionReadyTransactionResponse from(ProjectionReadyCashflowTransaction transaction) {
@@ -247,6 +248,7 @@ public class ManualReviewResolutionController {
                     transaction.amount(),
                     transaction.currency().getCurrencyCode(),
                     transaction.date(),
+                    transaction.direction().name(),
                     transaction.status().name()
             );
         }
@@ -257,6 +259,7 @@ public class ManualReviewResolutionController {
             BigDecimal amount,
             String currency,
             LocalDate date,
+            String movementDirection,
             String status
     ) {
         static ProjectableTransactionResponse from(ProjectedCashflowTransaction transaction, String outputStatus) {
@@ -265,6 +268,7 @@ public class ManualReviewResolutionController {
                     transaction.amount(),
                     transaction.currency().getCurrencyCode(),
                     transaction.date(),
+                    transaction.direction().name(),
                     outputStatus
             );
         }

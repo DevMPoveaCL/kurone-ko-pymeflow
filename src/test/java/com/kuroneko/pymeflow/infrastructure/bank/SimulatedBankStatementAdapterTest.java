@@ -3,6 +3,7 @@ package com.kuroneko.pymeflow.infrastructure.bank;
 import com.kuroneko.pymeflow.application.cashflow.CashflowIngestionService;
 import com.kuroneko.pymeflow.application.port.out.ExternalStatementEntry;
 import com.kuroneko.pymeflow.application.port.out.ExternalStatementImportCommand;
+import com.kuroneko.pymeflow.domain.cashflow.TransactionDirection;
 import com.kuroneko.pymeflow.domain.vertical.ProfileId;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
@@ -31,7 +32,9 @@ class SimulatedBankStatementAdapterTest {
     void mapsSignedNegativeToPositive() {
         importStatement(entry("BT-1", "Pago proveedor", new BigDecimal("-15000"), CLP));
 
-        assertThat(capturedItem().transaction().amount()).isEqualByComparingTo("15000");
+        var transaction = capturedItem().transaction();
+        assertThat(transaction.amount()).isEqualByComparingTo("15000");
+        assertThat(transaction.direction()).isEqualTo(TransactionDirection.DEBIT);
     }
 
     @Test
@@ -40,6 +43,7 @@ class SimulatedBankStatementAdapterTest {
 
         var transaction = capturedItem().transaction();
         assertThat(transaction.amount()).isEqualByComparingTo("7500");
+        assertThat(transaction.direction()).isEqualTo(TransactionDirection.CREDIT);
         assertThat(transaction.bookedAt()).isEqualTo(BOOKING_DATE);
     }
 

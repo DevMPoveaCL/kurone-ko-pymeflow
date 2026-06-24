@@ -36,6 +36,20 @@ class FlywaySeedIntegrationTest {
     }
 
     @Test
+    void flywayV4AddsMovementDirectionColumnWithCreditDefault() {
+        var column = jdbcTemplate.queryForMap("""
+                select is_nullable, column_default
+                from information_schema.columns
+                where table_schema = 'public'
+                  and table_name = 'cashflow_movement_history'
+                  and column_name = 'movement_direction'
+                """);
+
+        assertThat(column.get("is_nullable")).isEqualTo("NO");
+        assertThat(column.get("column_default").toString()).contains("'CREDIT'");
+    }
+
+    @Test
     void loadsProfileFromSeededDatabaseAndRunsCategorizationPipeline() {
         var adapter = new VerticalProfileJpaAdapter(jdbcTemplate);
         var profileService = new VerticalProfileService(adapter);

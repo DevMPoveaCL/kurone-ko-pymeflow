@@ -5,6 +5,7 @@ import com.kuroneko.pymeflow.application.port.out.CashflowMovementHistoryPort;
 import com.kuroneko.pymeflow.application.vertical.VerticalProfileService;
 import com.kuroneko.pymeflow.domain.cashflow.CategoryAssignment;
 import com.kuroneko.pymeflow.domain.cashflow.Transaction;
+import com.kuroneko.pymeflow.domain.cashflow.TransactionDirection;
 import com.kuroneko.pymeflow.domain.vertical.CashflowCategory;
 import com.kuroneko.pymeflow.domain.vertical.CashflowDirection;
 import com.kuroneko.pymeflow.domain.vertical.ProfileId;
@@ -158,6 +159,39 @@ class CashflowIngestionServiceTest {
         assertThat(result.categorized()).singleElement().satisfies(item -> assertThat(item.movementId()).isNotNull());
         assertThat(result.manualReview()).singleElement().satisfies(item -> assertThat(item.movementId()).isNotNull());
         assertThat(result.rejected()).singleElement().satisfies(item -> assertThat(item.movementId()).isNotNull());
+    }
+
+    @Test
+    void persistsDraftsWithDirectionCarriedByEachIngestionTransaction() {
+        var profileId = new ProfileId("retail-cl");
+        var category = new CashflowCategory("sales", "Sales", CashflowDirection.INFLOW);
+        var profile = new VerticalProfile(profileId, "Retail", List.of(), List.of(category), List.of());
+        var historyPort = new RecordingHistoryPort();
+        var service = new CashflowIngestionService(
+                new VerticalProfileService(id -> Optional.of(profile)),
+                (transaction, loadedProfile) -> transaction.description().contains("Manual")
+                        ? new CategoryAssignment(Optional.empty(), true)
+                        : new CategoryAssignment(Optional.of(category), false),
+                new SensitiveDataPolicy(List.of("blocked-token")),
+                historyPort
+        );
+
+        service.ingest(new CashflowIngestionService.CashflowIngestionCommand(
+                profileId,
+                List.of(
+                        item(transaction("Debit sale", BigDecimal.valueOf(1000), TransactionDirection.DEBIT)),
+                        item(transaction("Manual credit", BigDecimal.valueOf(2000), TransactionDirection.CREDIT)),
+                        item(transaction("Blocked debit blocked-token", BigDecimal.valueOf(3000), TransactionDirection.DEBIT))
+                )
+        ));
+
+        assertThat(historyPort.drafts)
+                .extracting(CashflowMovementDraft::direction)
+                .containsExactly(
+                        TransactionDirection.DEBIT,
+                        TransactionDirection.CREDIT,
+                        TransactionDirection.DEBIT
+                );
     }
 
     @Test
@@ -451,7 +485,11 @@ class CashflowIngestionServiceTest {
     }
 
     private static Transaction transaction(String description, BigDecimal amount) {
-        return new Transaction(description, amount, Currency.getInstance("CLP"), LocalDate.now());
+        return transaction(description, amount, TransactionDirection.CREDIT);
+    }
+
+    private static Transaction transaction(String description, BigDecimal amount, TransactionDirection direction) {
+        return new Transaction(description, amount, Currency.getInstance("CLP"), LocalDate.now(), direction);
     }
 
     private static CashflowIngestionService.CashflowIngestionCommand.IngestionItem item(Transaction transaction) {
@@ -470,6 +508,18 @@ class CashflowIngestionServiceTest {
             String sourceReference,
             String rejectionReasonCode
     ) {
+        return record(profileId, TransactionDirection.CREDIT, status, categoryKey, safeDescription, sourceReference, rejectionReasonCode);
+    }
+
+    private static CashflowMovementRecord record(
+            ProfileId profileId,
+            TransactionDirection direction,
+            CashflowMovementStatus status,
+            String categoryKey,
+            String safeDescription,
+            String sourceReference,
+            String rejectionReasonCode
+    ) {
         var now = Instant.now();
         return new CashflowMovementRecord(
                 UUID.randomUUID(),
@@ -477,6 +527,7 @@ class CashflowIngestionServiceTest {
                 BigDecimal.valueOf(1000),
                 Currency.getInstance("CLP"),
                 LocalDate.now(),
+                direction,
                 status,
                 categoryKey,
                 safeDescription,
@@ -523,6 +574,7 @@ class CashflowIngestionServiceTest {
                             draft.amount(),
                             draft.currency(),
                             draft.date(),
+                            draft.direction(),
                             draft.status(),
                             draft.categoryKey(),
                             draft.safeDescription(),

@@ -4,6 +4,9 @@ import com.kuroneko.pymeflow.application.cashflow.CashflowMovementRecord;
 import com.kuroneko.pymeflow.application.cashflow.CashflowMovementStatus;
 import com.kuroneko.pymeflow.application.port.out.CashflowMovementHistoryPort;
 import com.kuroneko.pymeflow.application.vertical.VerticalProfileService;
+import com.kuroneko.pymeflow.domain.cashflow.TransactionDirection;
+import com.kuroneko.pymeflow.domain.vertical.CashflowCategory;
+import com.kuroneko.pymeflow.domain.vertical.CashflowDirection;
 import com.kuroneko.pymeflow.domain.vertical.ProfileId;
 
 import java.math.BigDecimal;
@@ -51,7 +54,7 @@ public final class HistoryRecommendationService {
     }
 
     public HistoryRecommendationResponse generate(ProfileId profileId) {
-        verticalProfileService.loadProfile(profileId);
+        var profile = verticalProfileService.loadProfile(profileId);
 
         var manualReview = historyPort.findByStatus(profileId, CashflowMovementStatus.MANUAL_REVIEW);
         var projectable = historyPort.findByStatus(profileId, CashflowMovementStatus.PROJECTABLE);
@@ -63,6 +66,7 @@ public final class HistoryRecommendationService {
         addCategoryConcentrationSignal(signals, projectable);
         addInsufficientDataSignal(signals, projectable);
         addRecentInactivitySignal(signals, manualReview, projectable, rejected);
+        addDirectionMismatchSignal(signals, projectable, profile.categories());
 
         if (signals.isEmpty()) {
             signals.add(new HistorySignalResponse(
@@ -215,6 +219,40 @@ public final class HistoryRecommendationService {
                 "No se registran movimientos recientes en el historial.",
                 "Registra los movimientos más recientes para mantener el historial actualizado.",
                 Map.of("daysSinceLastMovement", daysSinceLastMovement)
+        ));
+    }
+
+    private static void addDirectionMismatchSignal(
+            List<HistorySignalResponse> signals,
+            List<CashflowMovementRecord> projectable,
+            List<CashflowCategory> categories
+    ) {
+        var directionsByCategory = categories.stream()
+                .collect(Collectors.toMap(CashflowCategory::key, CashflowCategory::direction));
+
+        var debitInflowCount = projectable.stream()
+                .filter(movement -> movement.direction() == TransactionDirection.DEBIT)
+                .filter(movement -> directionsByCategory.get(movement.categoryKey()) == CashflowDirection.INFLOW)
+                .count();
+        var creditOutflowCount = projectable.stream()
+                .filter(movement -> movement.direction() == TransactionDirection.CREDIT)
+                .filter(movement -> directionsByCategory.get(movement.categoryKey()) == CashflowDirection.OUTFLOW)
+                .count();
+
+        if (debitInflowCount == 0 && creditOutflowCount == 0) {
+            return;
+        }
+
+        signals.add(new HistorySignalResponse(
+                "DIRECTION_MISMATCH",
+                "INFO",
+                "Diferencia entre movimiento y categoría",
+                "Algunos movimientos tienen una dirección bancaria distinta a la dirección de su categoría.",
+                "Revisa si la categoría asignada refleja correctamente el movimiento bancario.",
+                Map.of(
+                        "debitInflowCount", debitInflowCount,
+                        "creditOutflowCount", creditOutflowCount
+                )
         ));
     }
 

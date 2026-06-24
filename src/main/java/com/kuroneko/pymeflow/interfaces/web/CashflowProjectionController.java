@@ -7,6 +7,7 @@ import com.kuroneko.pymeflow.application.cashflow.CashflowProjectionService;
 import com.kuroneko.pymeflow.application.cashflow.DailyProjectedBalance;
 import com.kuroneko.pymeflow.application.cashflow.ProjectedCashflowTransaction;
 import com.kuroneko.pymeflow.application.cashflow.ProjectionAlert;
+import com.kuroneko.pymeflow.domain.cashflow.TransactionDirection;
 import com.kuroneko.pymeflow.domain.vertical.ProfileId;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.media.Schema;
@@ -122,11 +123,21 @@ public class CashflowProjectionController {
             @Schema(example = "2026-02-01")
             LocalDate date,
 
+            @Schema(description = "Opcional. Si se omite, se asume CREDIT.", example = "CREDIT")
+            String movementDirection,
+
             @Schema(description = "Opcional. Si se informa, debe ser PROJECTABLE o CATEGORIZED.", example = "PROJECTABLE")
             String status
     ) {
         ProjectedCashflowTransaction toTransaction() {
-            return new ProjectedCashflowTransaction(categoryKey, amount, Currency.getInstance(currency), date);
+            return new ProjectedCashflowTransaction(categoryKey, amount, Currency.getInstance(currency), date, resolveMovementDirection());
+        }
+
+        private TransactionDirection resolveMovementDirection() {
+            if (movementDirection == null) {
+                return TransactionDirection.CREDIT;
+            }
+            return TransactionDirection.valueOf(movementDirection.trim().toUpperCase(java.util.Locale.ROOT));
         }
 
         boolean hasProjectableStatus() {

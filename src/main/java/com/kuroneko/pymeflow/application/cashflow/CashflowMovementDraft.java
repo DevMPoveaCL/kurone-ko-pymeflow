@@ -1,6 +1,7 @@
 package com.kuroneko.pymeflow.application.cashflow;
 
 import com.kuroneko.pymeflow.domain.vertical.ProfileId;
+import com.kuroneko.pymeflow.domain.cashflow.TransactionDirection;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
@@ -12,12 +13,27 @@ public record CashflowMovementDraft(
         BigDecimal amount,
         Currency currency,
         LocalDate date,
+        TransactionDirection direction,
         CashflowMovementStatus status,
         String categoryKey,
         String safeDescription,
         String sourceReference,
         String rejectionReasonCode
 ) {
+    public CashflowMovementDraft(
+            ProfileId profileId,
+            BigDecimal amount,
+            Currency currency,
+            LocalDate date,
+            CashflowMovementStatus status,
+            String categoryKey,
+            String safeDescription,
+            String sourceReference,
+            String rejectionReasonCode
+    ) {
+        this(profileId, amount, currency, date, TransactionDirection.CREDIT, status, categoryKey, safeDescription, sourceReference, rejectionReasonCode);
+    }
+
     public CashflowMovementDraft {
         if (profileId == null) {
             throw new IllegalArgumentException("Profile id is required");
@@ -30,6 +46,9 @@ public record CashflowMovementDraft(
         }
         if (date == null) {
             throw new IllegalArgumentException("Date is required");
+        }
+        if (direction == null) {
+            throw new IllegalArgumentException("Direction is required");
         }
         if (status == null) {
             throw new IllegalArgumentException("Status is required");
