@@ -1,0 +1,21 @@
+{
+  "nextCursor": "page-2",
+  "totalPagesEstimate": 2,
+  "rateLimitResetsAt": "2026-06-20T10:15:30Z",
+  "entries": [
+    {
+      "externalReference": "SAN-001",
+      "date": "2026-06-19",
+      "description": "Supplier payment",
+      "signedAmount": -15000.00,
+      "currency": "CLP"
+    },
+    {
+      "externalReference": "SAN-002",
+      "date": "2026-06-20",
+      "description": "Card settlement",
+      "signedAmount": 87500.00,
+      "currency": "CLP"
+    }
+  ]
+}

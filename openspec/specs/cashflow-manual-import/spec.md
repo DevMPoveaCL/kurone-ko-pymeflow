@@ -8,7 +8,7 @@ JSON batch endpoint for manual CSV-like cashflow row ingestion with per-row tole
 
 ### Requirement: Batch Endpoint Contract
 
-The system MUST expose and document in OpenAPI `POST /api/cashflow/imports/manual` accepting `profileId`, optional `importLabel`, and a `rows` array containing `rowNumber`, `description`, `amount`, `date`, optional `currency` (defaulting to CLP), and optional `externalReference`.
+The system MUST expose and document in OpenAPI `POST /api/cashflow/imports/manual` accepting `profileId`, optional `importLabel`, and a `rows` array containing `rowNumber`, `description`, `amount`, `date`, optional `currency` (defaulting to CLP), optional `externalReference`, and optional `movementDirection` (defaulting to `CREDIT`).
 
 #### Scenario: Valid batch accepted
 
@@ -40,7 +40,7 @@ The system MUST process valid rows independently; invalid rows MUST NOT block va
 
 ### Requirement: Row Field Validation
 
-The system MUST validate every row for `description` (non-blank), `amount` (positive), `date` (valid ISO), and `currency` (CLP only). Optional `externalReference` and `rowNumber` are accepted.
+The system MUST validate every row for `description` (non-blank), `amount` (positive), `date` (valid ISO), `currency` (CLP only), and optional `movementDirection` (if present, must be `DEBIT` or `CREDIT`). Optional `externalReference` and `rowNumber` are accepted.
 
 #### Scenario: Missing description
 
@@ -66,15 +66,37 @@ The system MUST validate every row for `description` (non-blank), `amount` (posi
 - WHEN validated
 - THEN an error is returned stating CLP is the only supported currency
 
+#### Scenario: Invalid movementDirection rejected
+
+- GIVEN a row with `movementDirection = "INVALID"`
+- WHEN validated
+- THEN an error is returned for the movementDirection field
+
 ### Requirement: Delegation to Ingestion Service
 
-The system MUST map each valid row to an `IngestionItem` and delegate to `CashflowIngestionService.ingest(...)`.
+The system MUST map each valid row to an `IngestionItem`, including resolved `movementDirection`, and delegate to `CashflowIngestionService.ingest(...)`.
 
 #### Scenario: Valid row ingestion delegation
 
-- GIVEN a valid row with `profileId`, `description`, `amount`, `date`, and optional `externalReference`
+- GIVEN a valid row with `profileId`, `description`, `amount`, `date`, optional `externalReference`, and resolved `movementDirection`
 - WHEN processed
-- THEN `CashflowIngestionService.ingest` is called with the mapped item
+- THEN `CashflowIngestionService.ingest` is called with the mapped item including `movementDirection`
+
+### Requirement: Optional Movement Direction Input
+
+The system MUST accept an optional `movementDirection` field in manual import rows. If omitted, the system MUST default to `CREDIT`.
+
+#### Scenario: Omitted direction defaults to CREDIT
+
+- GIVEN a valid row without `movementDirection`
+- WHEN ingested
+- THEN the ingestion item has `movementDirection = CREDIT`
+
+#### Scenario: Explicit DEBIT is accepted
+
+- GIVEN a valid row with `movementDirection = DEBIT`
+- WHEN ingested
+- THEN the ingestion item has `movementDirection = DEBIT`
 
 ### Requirement: Deduplication via Fingerprint Fallback
 
@@ -120,7 +142,7 @@ The system MUST reject rows containing sensitive descriptions or references and 
 
 ### Requirement: Summary Response
 
-The system MUST return a response containing `importId` (response-only), `profileId`, flat counts for `accepted`, `categorizedCount`, `manualReviewCount`, `rejectedCount`, and `invalid`, plus per-row results. Successful result entries in `categorized`, `manualReview`, and `rejected` and validation entries in `errors` MUST include a `row` value that echoes the submitted `rowNumber` when present, falling back to the submitted 1-based position only when `rowNumber` is absent.
+The system MUST return a response containing `importId` (response-only), `profileId`, flat counts for `accepted`, `categorizedCount`, `manualReviewCount`, `rejectedCount`, and `invalid`, plus per-row results. Successful result entries in `categorized`, `manualReview`, and `rejected` MUST include `movementDirection`. Successful result entries and validation entries in `errors` MUST include a `row` value that echoes the submitted `rowNumber` when present, falling back to the submitted 1-based position only when `rowNumber` is absent.
 
 #### Scenario: Mixed batch response summary
 

@@ -24,13 +24,19 @@ The system MUST expose `POST /api/cashflow/imports/bank-statement/simulated` acc
 
 ### Requirement: Anti-Corruption Mapping
 
-The system MUST translate bank-like rows into `IngestionItem` through a bank-agnostic application port (`ExternalStatementImportPort`), mapping `bankTransactionId` to `externalReference`, `amount.abs()` to positive `amount`, `bookingDate` to `date`, and prepending `counterpartyName` to `description` when present. `accountAlias` MUST be dropped for MVP.
+The system MUST translate bank-like rows into `IngestionItem` through a bank-agnostic application port (`ExternalStatementImportPort`), mapping `bankTransactionId` to `externalReference`, `amount.abs()` to positive `amount`, the signed amount to `movementDirection` (`DEBIT` for negative, `CREDIT` for positive), `bookingDate` to `date`, and prepending `counterpartyName` to `description` when present. `accountAlias` MUST be dropped for MVP.
 
-#### Scenario: Signed debit mapped to positive amount
+#### Scenario: Signed debit mapped to DEBIT with positive amount
 
 - GIVEN a row with `amount = -15000`
 - WHEN mapped
-- THEN the ingestion item has `amount = 15000`
+- THEN the ingestion item has `amount = 15000` and `movementDirection = DEBIT`
+
+#### Scenario: Signed credit mapped to CREDIT with positive amount
+
+- GIVEN a row with `amount = 15000`
+- WHEN mapped
+- THEN the ingestion item has `amount = 15000` and `movementDirection = CREDIT`
 
 #### Scenario: Counterparty enriches description
 
@@ -43,6 +49,16 @@ The system MUST translate bank-like rows into `IngestionItem` through a bank-agn
 - GIVEN a row with `description = "Pago"` and no `counterpartyName`
 - WHEN mapped
 - THEN the ingestion item has `description = "Pago"`
+
+### Requirement: Response Direction Exposure
+
+The system MUST include `movementDirection` in bank-statement import responses where relevant.
+
+#### Scenario: Successful import result includes direction
+
+- GIVEN a bank statement row is imported successfully
+- WHEN the response is returned
+- THEN the result entry for that row includes `movementDirection`
 
 ### Requirement: Idempotency via bankTransactionId
 
@@ -63,16 +79,6 @@ The system MUST reject rows containing a sensitive `bankTransactionId` and MUST 
 - GIVEN a row with a sensitive `bankTransactionId`
 - WHEN validated
 - THEN the row is rejected and the error message does not contain the sensitive value
-
-### Requirement: Direction Loss Documentation
-
-The system MUST document that debit/credit direction is lost when signed amounts are converted to positive values. This is an accepted MVP tradeoff.
-
-#### Scenario: Direction loss is explicit
-
-- GIVEN a row with `amount = -5000` and another with `amount = 5000`
-- WHEN both are processed
-- THEN both result in positive `amount = 5000` with no direction distinction
 
 ### Requirement: CLP-Only Currency Enforcement
 

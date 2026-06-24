@@ -50,16 +50,12 @@ public class CashflowBankStatementSimulatedController {
         this.sensitiveDataPolicy = sensitiveDataPolicy;
     }
 
-    /**
-     * Direction loss — signed amounts become positive downstream; debit/credit direction is lost by design
-     * for the MVP tradeoff.
-     */
     @PostMapping
     @Operation(
             summary = "Import simulated bank statement rows",
             description = "Procesa filas simuladas con forma de cartola bancaria para validar el límite anti-corrupción. "
-                    + "Tradeoff MVP: los montos con signo se convierten a valores positivos en el adaptador; "
-                    + "se pierde la distinción débito/crédito."
+                    + "Los montos con signo se normalizan a valores positivos en el adaptador y la dirección "
+                    + "del movimiento se conserva como DEBIT o CREDIT."
     )
     @ApiResponses({
             @ApiResponse(responseCode = "200", description = "Al menos una fila fue aceptada para importación."),
@@ -282,7 +278,7 @@ public class CashflowBankStatementSimulatedController {
         }
     }
 
-    public record RejectedTransactionResponse(int row, UUID movementId, BigDecimal amount, String currency, LocalDate date, String reasonCode, String reason) {
+    public record RejectedTransactionResponse(int row, UUID movementId, BigDecimal amount, String currency, LocalDate date, String movementDirection, String reasonCode, String reason) {
         static RejectedTransactionResponse from(int row, CashflowIngestionService.RejectedTransaction result) {
             var transaction = result.transaction();
             return new RejectedTransactionResponse(
@@ -291,19 +287,21 @@ public class CashflowBankStatementSimulatedController {
                     transaction.amount(),
                     transaction.currency().getCurrencyCode(),
                     transaction.bookedAt(),
+                    transaction.direction().name(),
                     result.reasonCode(),
                     SENSITIVE_REJECTION_REASON
             );
         }
     }
 
-    public record TransactionResponse(String description, BigDecimal amount, String currency, LocalDate date) {
+    public record TransactionResponse(String description, BigDecimal amount, String currency, LocalDate date, String movementDirection) {
         static TransactionResponse from(Transaction transaction) {
             return new TransactionResponse(
                     transaction.description(),
                     transaction.amount(),
                     transaction.currency().getCurrencyCode(),
-                    transaction.bookedAt()
+                    transaction.bookedAt(),
+                    transaction.direction().name()
             );
         }
     }

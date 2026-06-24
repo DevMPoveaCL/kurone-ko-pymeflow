@@ -4,7 +4,9 @@ import com.kuroneko.pymeflow.application.cashflow.CashflowIngestionService;
 import com.kuroneko.pymeflow.application.port.out.ExternalStatementImportCommand;
 import com.kuroneko.pymeflow.application.port.out.ExternalStatementImportPort;
 import com.kuroneko.pymeflow.domain.cashflow.Transaction;
+import com.kuroneko.pymeflow.domain.cashflow.TransactionDirection;
 
+import java.math.BigDecimal;
 import java.util.Currency;
 
 public final class SimulatedBankStatementAdapter implements ExternalStatementImportPort {
@@ -27,7 +29,8 @@ public final class SimulatedBankStatementAdapter implements ExternalStatementImp
                             descriptionFor(entry.counterpartyName(), entry.description()),
                             entry.amount().abs(),
                             entry.currency(),
-                            entry.date()
+                            entry.date(),
+                            directionFor(entry.amount())
                     );
                     return new CashflowIngestionService.CashflowIngestionCommand.IngestionItem(
                             transaction,
@@ -47,5 +50,9 @@ public final class SimulatedBankStatementAdapter implements ExternalStatementImp
             return description;
         }
         return counterpartyName.trim() + " | " + description;
+    }
+
+    private static TransactionDirection directionFor(BigDecimal amount) {
+        return amount.signum() < 0 ? TransactionDirection.DEBIT : TransactionDirection.CREDIT;
     }
 }

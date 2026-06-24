@@ -3,6 +3,7 @@ package com.kuroneko.pymeflow.infrastructure.persistence;
 import com.kuroneko.pymeflow.application.cashflow.CashflowMovementDraft;
 import com.kuroneko.pymeflow.application.cashflow.CashflowMovementStatus;
 import com.kuroneko.pymeflow.application.cashflow.ManualReviewMovementResolutionCommand;
+import com.kuroneko.pymeflow.domain.cashflow.TransactionDirection;
 import com.kuroneko.pymeflow.domain.vertical.ProfileId;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -19,6 +20,7 @@ import java.sql.Connection;
 import java.time.LocalDate;
 import java.util.Currency;
 import java.util.List;
+import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -46,8 +48,10 @@ class CashflowMovementHistoryJdbcAdapterTest {
         jdbcTemplate.execute("create table if not exists vertical_profile_categories (profile_id varchar(63) not null references vertical_profiles(id), category_key varchar(80) not null, display_name varchar(120) not null, direction varchar(20) not null, sort_order integer not null, primary key (profile_id, category_key))");
         jdbcTemplate.execute("create table if not exists vertical_profile_rules (profile_id varchar(63) not null references vertical_profiles(id), rule_key varchar(100) not null, condition_key varchar(120) not null, threshold numeric(18, 2) not null, action_key varchar(100) not null, primary key (profile_id, rule_key))");
         jdbcTemplate.execute("create table if not exists vertical_profile_obligation_templates (profile_id varchar(63) not null references vertical_profiles(id), obligation_key varchar(100) not null, display_name varchar(120) not null, estimated_amount numeric(18, 2) not null, frequency varchar(20) not null, due_day_of_month integer not null, primary key (profile_id, obligation_key))");
+        jdbcTemplate.execute("drop table if exists cashflow_movement_history");
         try (Connection connection = dataSource.getConnection()) {
             ScriptUtils.executeSqlScript(connection, new ClassPathResource("db/migration/V2__create_cashflow_movement_history.sql"));
+            ScriptUtils.executeSqlScript(connection, new ClassPathResource("db/migration/V4__add_movement_direction.sql"));
         }
         createSourceReferenceUniqueIndexForH2();
         jdbcTemplate.update("delete from cashflow_movement_history");
@@ -230,6 +234,54 @@ class CashflowMovementHistoryJdbcAdapterTest {
         assertThat(second.id()).isEqualTo(first.id());
         assertThat(second.sourceReference()).isEqualTo(sourceReference);
         assertThat(second.safeDescription()).isEqualTo("Venta Caja 1");
+    }
+
+    @Test
+    void savesAndReadsDebitMovementDirection() {
+        var saved = adapter.saveAll(List.of(new CashflowMovementDraft(
+                PROFILE_ID,
+                BigDecimal.valueOf(1200),
+                Currency.getInstance("CLP"),
+                LocalDate.of(2026, 6, 1),
+                TransactionDirection.DEBIT,
+                CashflowMovementStatus.MANUAL_REVIEW,
+                null,
+                "Proveedor insumos",
+                "batch-debit-001",
+                null
+        ))).getFirst();
+
+        var found = adapter.findById(saved.id());
+
+        assertThat(found).isPresent();
+        assertThat(found.orElseThrow().direction()).isEqualTo(TransactionDirection.DEBIT);
+    }
+
+    @Test
+    void readsLegacyRowsWithoutMovementDirectionAsCreditDefault() {
+        var movementId = UUID.randomUUID();
+        jdbcTemplate.update("""
+                        insert into cashflow_movement_history
+                        (id, profile_id, amount, currency, movement_date, status, category_key,
+                         safe_description, source_reference, rejection_reason_code, resolved_at, created_at, updated_at)
+                        values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, now(), now(), now())
+                        """,
+                movementId,
+                PROFILE_ID.value(),
+                BigDecimal.valueOf(2000),
+                "CLP",
+                LocalDate.of(2026, 6, 2),
+                CashflowMovementStatus.PROJECTABLE.name(),
+                "sales",
+                "Venta histórica",
+                "legacy-credit-001",
+                null
+        );
+
+        var found = adapter.findById(movementId);
+
+        assertThat(found).isPresent();
+        assertThat(found.orElseThrow().direction()).isEqualTo(TransactionDirection.CREDIT);
     }
 
     private static CashflowMovementDraft manualReview(String safeDescription, String sourceReference) {

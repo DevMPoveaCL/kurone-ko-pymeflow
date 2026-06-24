@@ -1,24 +1,27 @@
 package com.kuroneko.pymeflow.infrastructure.config;
 
-import com.kuroneko.pymeflow.application.port.out.AccountantExportPort;
-import com.kuroneko.pymeflow.application.export.AccountantExportService;
-import com.kuroneko.pymeflow.application.cashflow.CashflowProjectionService;
-import com.kuroneko.pymeflow.application.cashflow.CashflowMovementHistoryService;
-import com.kuroneko.pymeflow.application.cashflow.ManualReviewResolutionService;
 import com.kuroneko.pymeflow.application.cashflow.CashflowIngestionService;
+import com.kuroneko.pymeflow.application.cashflow.CashflowMovementHistoryService;
+import com.kuroneko.pymeflow.application.cashflow.CashflowProjectionService;
+import com.kuroneko.pymeflow.application.cashflow.ManualReviewResolutionService;
+import com.kuroneko.pymeflow.application.cashflow.ProviderSyncUseCase;
 import com.kuroneko.pymeflow.application.cashflow.SensitiveDataPolicy;
+import com.kuroneko.pymeflow.application.export.AccountantExportService;
+import com.kuroneko.pymeflow.application.port.out.AccountantExportPort;
+import com.kuroneko.pymeflow.application.port.out.BankProviderPort;
 import com.kuroneko.pymeflow.application.port.out.CashflowCategorizationPort;
 import com.kuroneko.pymeflow.application.port.out.CashflowMovementHistoryPort;
 import com.kuroneko.pymeflow.application.port.out.ExternalStatementImportPort;
 import com.kuroneko.pymeflow.application.port.out.ProfileRegistryPort;
+import com.kuroneko.pymeflow.application.port.out.SyncSessionPort;
 import com.kuroneko.pymeflow.application.recommendation.HistoryRecommendationService;
 import com.kuroneko.pymeflow.application.vertical.VerticalProfileService;
 import com.kuroneko.pymeflow.infrastructure.bank.SimulatedBankStatementAdapter;
+import com.kuroneko.pymeflow.infrastructure.provider.FakeBankProviderAdapter;
+import com.kuroneko.pymeflow.infrastructure.provider.InMemorySyncSessionAdapter;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnBean;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
-
-import java.util.List;
 
 @Configuration
 public class ApplicationServiceConfiguration {
@@ -87,5 +90,31 @@ public class ApplicationServiceConfiguration {
     @Bean
     ExternalStatementImportPort externalStatementImportPort(CashflowIngestionService cashflowIngestionService) {
         return new SimulatedBankStatementAdapter(cashflowIngestionService);
+    }
+
+    @Bean
+    BankProviderPort bankProviderPort() {
+        return new FakeBankProviderAdapter();
+    }
+
+    @Bean
+    SyncSessionPort syncSessionPort() {
+        return new InMemorySyncSessionAdapter();
+    }
+
+    @Bean
+    ProviderSyncUseCase providerSyncUseCase(
+            BankProviderPort bankProviderPort,
+            ExternalStatementImportPort externalStatementImportPort,
+            SyncSessionPort syncSessionPort,
+            ProviderAuthConfig providerAuthConfig
+    ) {
+        return new ProviderSyncUseCase.ProviderSyncService(
+                bankProviderPort,
+                externalStatementImportPort,
+                syncSessionPort,
+                providerAuthConfig.maxPages(),
+                providerAuthConfig.pageSize()
+        );
     }
 }

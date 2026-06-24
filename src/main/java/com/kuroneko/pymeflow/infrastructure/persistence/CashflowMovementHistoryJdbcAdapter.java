@@ -4,6 +4,7 @@ import com.kuroneko.pymeflow.application.cashflow.CashflowMovementDraft;
 import com.kuroneko.pymeflow.application.cashflow.CashflowMovementRecord;
 import com.kuroneko.pymeflow.application.cashflow.CashflowMovementStatus;
 import com.kuroneko.pymeflow.application.cashflow.ManualReviewMovementResolutionCommand;
+import com.kuroneko.pymeflow.domain.cashflow.TransactionDirection;
 import com.kuroneko.pymeflow.application.port.out.CashflowMovementHistoryPort;
 import com.kuroneko.pymeflow.domain.vertical.ProfileId;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -24,7 +25,7 @@ import java.util.UUID;
 @Repository
 public class CashflowMovementHistoryJdbcAdapter implements CashflowMovementHistoryPort {
     private static final String SELECT_COLUMNS = """
-            select id, profile_id, amount, currency, movement_date, status, category_key,
+            select id, profile_id, amount, currency, movement_date, movement_direction, status, category_key,
                    safe_description, source_reference, rejection_reason_code,
                    resolved_at, created_at, updated_at
             from cashflow_movement_history
@@ -124,16 +125,17 @@ public class CashflowMovementHistoryJdbcAdapter implements CashflowMovementHisto
         try {
             jdbcTemplate.update("""
                             insert into cashflow_movement_history
-                            (id, profile_id, amount, currency, movement_date, status, category_key,
+                            (id, profile_id, amount, currency, movement_date, movement_direction, status, category_key,
                              safe_description, source_reference, rejection_reason_code,
                              resolved_at, created_at, updated_at)
-                            values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                            values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                             """,
                     id,
                     draft.profileId().value(),
                     draft.amount(),
                     draft.currency().getCurrencyCode(),
                     draft.date(),
+                    draft.direction().name(),
                     draft.status().name(),
                     draft.categoryKey(),
                     draft.safeDescription(),
@@ -166,6 +168,7 @@ public class CashflowMovementHistoryJdbcAdapter implements CashflowMovementHisto
                 rs.getBigDecimal("amount"),
                 Currency.getInstance(rs.getString("currency")),
                 rs.getDate("movement_date").toLocalDate(),
+                TransactionDirection.valueOf(rs.getString("movement_direction")),
                 CashflowMovementStatus.valueOf(rs.getString("status")),
                 rs.getString("category_key"),
                 rs.getString("safe_description"),

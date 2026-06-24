@@ -4,6 +4,7 @@ import com.kuroneko.pymeflow.application.port.out.CashflowMovementHistoryPort;
 import com.kuroneko.pymeflow.application.vertical.VerticalProfileService;
 import com.kuroneko.pymeflow.domain.cashflow.CategoryAssignment;
 import com.kuroneko.pymeflow.domain.cashflow.Transaction;
+import com.kuroneko.pymeflow.domain.cashflow.TransactionDirection;
 import com.kuroneko.pymeflow.domain.vertical.CashflowCategory;
 import com.kuroneko.pymeflow.domain.vertical.CashflowDirection;
 import com.kuroneko.pymeflow.domain.vertical.ProfileId;
@@ -57,12 +58,14 @@ class CashflowMovementHistoryServiceTest {
 
         assertThat(projectionReady).hasSize(1);
         assertThat(projectionReady.getFirst().categoryKey()).isEqualTo("sales");
+        assertThat(projectionReady.getFirst().direction()).isEqualTo(TransactionDirection.DEBIT);
         assertThat(projectionReady.getFirst().status()).isEqualTo(CashflowMovementStatus.PROJECTABLE);
         assertThat(projectionReady.getFirst().toProjectionTransaction()).isEqualTo(new ProjectedCashflowTransaction(
                 "sales",
                 BigDecimal.valueOf(10_000),
                 CLP,
-                LocalDate.of(2026, 6, 2)
+                LocalDate.of(2026, 6, 2),
+                TransactionDirection.DEBIT
         ));
     }
 
@@ -134,6 +137,7 @@ class CashflowMovementHistoryServiceTest {
         assertThat(historyService.pendingManualReviews(PROFILE_ID)).singleElement().satisfies(movement -> {
             assertThat(movement.description()).isEqualTo("Pago farmacia");
             assertThat(movement.sourceReference()).isEqualTo(expectedReference);
+            assertThat(movement.direction()).isEqualTo(TransactionDirection.CREDIT);
             assertThat(movement.sourceReference()).startsWith("fp:v1:");
         });
     }
@@ -197,6 +201,7 @@ class CashflowMovementHistoryServiceTest {
                 BigDecimal.valueOf(10_000),
                 CLP,
                 date,
+                status == CashflowMovementStatus.PROJECTABLE ? TransactionDirection.DEBIT : TransactionDirection.CREDIT,
                 status,
                 categoryKey,
                 safeDescription,
@@ -235,6 +240,7 @@ class CashflowMovementHistoryServiceTest {
                             draft.amount(),
                             draft.currency(),
                             draft.date(),
+                            draft.direction(),
                             draft.status(),
                             draft.categoryKey(),
                             draft.safeDescription(),
@@ -291,6 +297,7 @@ class CashflowMovementHistoryServiceTest {
                     current.amount(),
                     current.currency(),
                     current.date(),
+                    current.direction(),
                     CashflowMovementStatus.PROJECTABLE,
                     command.categoryKey(),
                     current.safeDescription(),

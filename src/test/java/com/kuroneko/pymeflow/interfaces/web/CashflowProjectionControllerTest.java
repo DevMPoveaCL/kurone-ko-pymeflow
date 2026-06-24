@@ -5,6 +5,7 @@ import com.kuroneko.pymeflow.application.cashflow.CashflowProjectionResult;
 import com.kuroneko.pymeflow.application.cashflow.CashflowProjectionService;
 import com.kuroneko.pymeflow.application.cashflow.DailyProjectedBalance;
 import com.kuroneko.pymeflow.application.cashflow.ProjectionAlert;
+import com.kuroneko.pymeflow.domain.cashflow.TransactionDirection;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
@@ -16,9 +17,12 @@ import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.List;
 
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.ArgumentCaptor.forClass;
 import static org.hamcrest.Matchers.containsString;
 import static org.hamcrest.Matchers.not;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
@@ -161,6 +165,38 @@ class CashflowProjectionControllerTest {
     }
 
     @Test
+    void mapsOptionalMovementDirectionFromProjectionRequestIntoCommand() throws Exception {
+        when(cashflowProjectionService.project(any())).thenReturn(emptyProjectionResult());
+
+        mockMvc.perform(post("/api/cashflow/projections")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(validPayloadWithMovementDirection("DEBIT")))
+                .andExpect(status().isOk());
+
+        var captor = forClass(com.kuroneko.pymeflow.application.cashflow.CashflowProjectionCommand.class);
+        verify(cashflowProjectionService).project(captor.capture());
+        assertThat(captor.getValue().transactions())
+                .singleElement()
+                .satisfies(transaction -> assertThat(transaction.direction()).isEqualTo(TransactionDirection.DEBIT));
+    }
+
+    @Test
+    void defaultsOmittedProjectionMovementDirectionToCredit() throws Exception {
+        when(cashflowProjectionService.project(any())).thenReturn(emptyProjectionResult());
+
+        mockMvc.perform(post("/api/cashflow/projections")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(validPayload()))
+                .andExpect(status().isOk());
+
+        var captor = forClass(com.kuroneko.pymeflow.application.cashflow.CashflowProjectionCommand.class);
+        verify(cashflowProjectionService).project(captor.capture());
+        assertThat(captor.getValue().transactions())
+                .singleElement()
+                .satisfies(transaction -> assertThat(transaction.direction()).isEqualTo(TransactionDirection.CREDIT));
+    }
+
+    @Test
     void returnsCurrencyMismatchAsNeutralSpanishBadRequest() throws Exception {
         when(cashflowProjectionService.project(any()))
                 .thenThrow(new IllegalArgumentException("Transaction currency must match projection currency"));
@@ -186,5 +222,24 @@ class CashflowProjectionControllerTest {
                   ]
                 }
                 """;
+    }
+
+    private static String validPayloadWithMovementDirection(String movementDirection) {
+        return """
+                {
+                  "profileId": "pharmacy-cl",
+                  "openingBalance": 1500000,
+                  "currency": "CLP",
+                  "startDate": "2026-02-01",
+                  "horizonDays": 3,
+                  "transactions": [
+                    {"categoryKey": "sales", "amount": 125000, "currency": "CLP", "date": "2026-02-01", "status": "PROJECTABLE", "movementDirection": "%s"}
+                  ]
+                }
+                """.formatted(movementDirection);
+    }
+
+    private static CashflowProjectionResult emptyProjectionResult() {
+        return new CashflowProjectionResult(List.of(), BigDecimal.ZERO, List.of(), List.of());
     }
 }

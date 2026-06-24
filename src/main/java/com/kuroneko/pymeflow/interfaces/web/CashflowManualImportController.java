@@ -5,6 +5,7 @@ import com.kuroneko.pymeflow.application.cashflow.CashflowIngestionService.Cashf
 import com.kuroneko.pymeflow.application.cashflow.CashflowIngestionService.CashflowIngestionCommand.IngestionItem;
 import com.kuroneko.pymeflow.application.cashflow.CashflowIngestionService.CashflowIngestionResult;
 import com.kuroneko.pymeflow.domain.cashflow.Transaction;
+import com.kuroneko.pymeflow.domain.cashflow.TransactionDirection;
 import com.kuroneko.pymeflow.domain.vertical.CashflowCategory;
 import com.kuroneko.pymeflow.domain.vertical.ProfileId;
 import io.swagger.v3.oas.annotations.Operation;
@@ -99,6 +100,9 @@ public class CashflowManualImportController {
         if (!currencyOrDefault(row).equals(CLP)) {
             return Optional.of(new RowErrorResponse(rowNumber, "currency", "La única moneda soportada es CLP."));
         }
+        if (parseMovementDirection(row.movementDirection()).isEmpty()) {
+            return Optional.of(new RowErrorResponse(rowNumber, "movementDirection", "La dirección del movimiento debe ser DEBIT o CREDIT."));
+        }
         return Optional.empty();
     }
 
@@ -108,7 +112,8 @@ public class CashflowManualImportController {
                         row.description(),
                         row.amount(),
                         Currency.getInstance(currencyOrDefault(row)),
-                        LocalDate.parse(row.date())
+                        LocalDate.parse(row.date()),
+                        resolveMovementDirection(row.movementDirection())
                 ),
                 row.externalReference()
         );
@@ -116,6 +121,24 @@ public class CashflowManualImportController {
 
     private static String currencyOrDefault(ManualImportRow row) {
         return row.currency() == null || row.currency().isBlank() ? CLP : row.currency();
+    }
+
+    private static TransactionDirection resolveMovementDirection(String movementDirection) {
+        return parseMovementDirection(movementDirection).orElse(TransactionDirection.CREDIT);
+    }
+
+    private static Optional<TransactionDirection> parseMovementDirection(String movementDirection) {
+        if (movementDirection == null) {
+            return Optional.of(TransactionDirection.CREDIT);
+        }
+        if (movementDirection.isBlank()) {
+            return Optional.empty();
+        }
+        try {
+            return Optional.of(TransactionDirection.valueOf(movementDirection.trim().toUpperCase(java.util.Locale.ROOT)));
+        } catch (IllegalArgumentException exception) {
+            return Optional.empty();
+        }
     }
 
     private static int responseRowNumber(ManualImportRow row, int index) {
@@ -158,7 +181,7 @@ public class CashflowManualImportController {
     public record ManualImportRequest(String profileId, String importLabel, List<ManualImportRow> rows) {
     }
 
-    public record ManualImportRow(Integer rowNumber, String description, BigDecimal amount, String currency, String date, String externalReference) {
+    public record ManualImportRow(Integer rowNumber, String description, BigDecimal amount, String currency, String date, String externalReference, String movementDirection) {
     }
 
     private record ValidRow(int row, Transaction transaction) {
@@ -166,7 +189,8 @@ public class CashflowManualImportController {
             return transaction.description().equals(candidate.description())
                     && transaction.amount().compareTo(candidate.amount()) == 0
                     && transaction.currency().equals(candidate.currency())
-                    && transaction.bookedAt().equals(candidate.bookedAt());
+                    && transaction.bookedAt().equals(candidate.bookedAt())
+                    && transaction.direction().equals(candidate.direction());
         }
     }
 
@@ -230,7 +254,7 @@ public class CashflowManualImportController {
         }
     }
 
-    public record RejectedTransactionResponse(int row, UUID movementId, BigDecimal amount, String currency, LocalDate date, String reasonCode, String reason) {
+    public record RejectedTransactionResponse(int row, UUID movementId, BigDecimal amount, String currency, LocalDate date, String movementDirection, String reasonCode, String reason) {
         static RejectedTransactionResponse from(int row, CashflowIngestionService.RejectedTransaction result) {
             var transaction = result.transaction();
             return new RejectedTransactionResponse(
@@ -239,19 +263,21 @@ public class CashflowManualImportController {
                     transaction.amount(),
                     transaction.currency().getCurrencyCode(),
                     transaction.bookedAt(),
+                    transaction.direction().name(),
                     result.reasonCode(),
                     SENSITIVE_REJECTION_REASON
             );
         }
     }
 
-    public record TransactionResponse(String description, BigDecimal amount, String currency, LocalDate date) {
+    public record TransactionResponse(String description, BigDecimal amount, String currency, LocalDate date, String movementDirection) {
         static TransactionResponse from(Transaction transaction) {
             return new TransactionResponse(
                     transaction.description(),
                     transaction.amount(),
                     transaction.currency().getCurrencyCode(),
-                    transaction.bookedAt()
+                    transaction.bookedAt(),
+                    transaction.direction().name()
             );
         }
     }

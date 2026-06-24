@@ -72,6 +72,7 @@ public class CashflowHistoryController {
             BigDecimal amount,
             String currency,
             LocalDate date,
+            String movementDirection,
             String description,
             String sourceReference,
             String status
@@ -82,6 +83,7 @@ public class CashflowHistoryController {
                     movement.amount(),
                     movement.currency().getCurrencyCode(),
                     movement.date(),
+                    movement.direction().name(),
                     movement.description(),
                     movement.sourceReference(),
                     movement.status().name()
@@ -96,6 +98,7 @@ public class CashflowHistoryController {
             BigDecimal amount,
             String currency,
             LocalDate date,
+            String movementDirection,
             String status
     ) {
         static ProjectionReadyTransactionResponse from(ProjectionReadyCashflowTransaction transaction) {
@@ -105,6 +108,7 @@ public class CashflowHistoryController {
                     transaction.amount(),
                     transaction.currency().getCurrencyCode(),
                     transaction.date(),
+                    transaction.direction().name(),
                     transaction.status().name()
             );
         }
