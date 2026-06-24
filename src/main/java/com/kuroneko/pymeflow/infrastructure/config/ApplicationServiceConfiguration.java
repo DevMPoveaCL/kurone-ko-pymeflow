@@ -4,6 +4,7 @@ import com.kuroneko.pymeflow.application.cashflow.CashflowIngestionService;
 import com.kuroneko.pymeflow.application.cashflow.CashflowMovementHistoryService;
 import com.kuroneko.pymeflow.application.cashflow.CashflowProjectionService;
 import com.kuroneko.pymeflow.application.cashflow.ManualReviewResolutionService;
+import com.kuroneko.pymeflow.application.cashflow.ProviderSyncStatusUseCase;
 import com.kuroneko.pymeflow.application.cashflow.ProviderSyncUseCase;
 import com.kuroneko.pymeflow.application.cashflow.SensitiveDataPolicy;
 import com.kuroneko.pymeflow.application.export.AccountantExportService;
@@ -116,5 +117,10 @@ public class ApplicationServiceConfiguration {
                 providerAuthConfig.maxPages(),
                 providerAuthConfig.pageSize()
         );
+    }
+
+    @Bean
+    ProviderSyncStatusUseCase providerSyncStatusUseCase(SyncSessionPort syncSessionPort) {
+        return new ProviderSyncStatusUseCase(syncSessionPort);
     }
 }

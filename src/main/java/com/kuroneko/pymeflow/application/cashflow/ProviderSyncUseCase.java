@@ -180,7 +180,7 @@ public interface ProviderSyncUseCase {
             }
 
             var truncated = (hasMorePages || stoppedAfterUnavailable) && attempts == maxPages;
-            return new ProviderSyncReport(
+            var report = new ProviderSyncReport(
                     syncId,
                     pagesFetched,
                     entriesFetched,
@@ -191,6 +191,25 @@ public interface ProviderSyncUseCase {
                     errors,
                     retryAfterSeconds(errors)
             );
+            syncSessionPort.recordReport(new SyncSessionPort.SyncSessionSnapshot(
+                    report.syncId(),
+                    command.profileId(),
+                    providerType,
+                    statusFor(report),
+                    report.pagesFetched(),
+                    report.entriesFetched(),
+                    report.importedEntries(),
+                    report.hasMorePages(),
+                    report.truncated(),
+                    report.authAborted(),
+                    cursor,
+                    syncSessionPort.lastSyncAt(command.profileId(), providerType),
+                    syncSessionPort.entryCount(command.profileId(), providerType),
+                    report.errors(),
+                    report.retryAfterSeconds(),
+                    SyncSessionPort.Durability.IN_MEMORY
+            ));
+            return report;
         }
 
         private static int importedEntryCount(CashflowIngestionService.CashflowIngestionResult result) {
@@ -203,6 +222,16 @@ public interface ProviderSyncUseCase {
                     .map(ProviderError.RateLimitError.class::cast)
                     .map(ProviderError.RateLimitError::retryAfterSeconds)
                     .findFirst();
+        }
+
+        private static SyncSessionPort.SyncStatus statusFor(ProviderSyncReport report) {
+            if (report.errors().isEmpty() && !report.truncated()) {
+                return SyncSessionPort.SyncStatus.COMPLETED;
+            }
+            if (report.pagesFetched() > 0 || report.entriesFetched() > 0 || report.importedEntries() > 0 || report.truncated()) {
+                return SyncSessionPort.SyncStatus.PARTIAL;
+            }
+            return SyncSessionPort.SyncStatus.FAILED;
         }
     }
 }

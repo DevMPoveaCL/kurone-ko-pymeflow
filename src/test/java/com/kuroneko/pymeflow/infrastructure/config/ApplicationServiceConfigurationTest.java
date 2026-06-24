@@ -1,6 +1,7 @@
 package com.kuroneko.pymeflow.infrastructure.config;
 
 import com.kuroneko.pymeflow.application.cashflow.CashflowIngestionService;
+import com.kuroneko.pymeflow.application.cashflow.ProviderSyncStatusUseCase;
 import com.kuroneko.pymeflow.application.cashflow.ProviderSyncUseCase;
 import com.kuroneko.pymeflow.application.port.out.BankProviderPort;
 import com.kuroneko.pymeflow.application.port.out.ExternalStatementImportPort;
@@ -38,6 +39,15 @@ class ApplicationServiceConfigurationTest {
 
         assertThat(sessionPort).isInstanceOf(InMemorySyncSessionAdapter.class);
         assertThat(useCase).isInstanceOf(ProviderSyncUseCase.ProviderSyncService.class);
+    }
+
+    @Test
+    void wiresProviderSyncStatusUseCaseWithSessionPort() {
+        var configuration = new ApplicationServiceConfiguration();
+
+        ProviderSyncStatusUseCase statusUseCase = configuration.providerSyncStatusUseCase(mock(SyncSessionPort.class));
+
+        assertThat(statusUseCase).isInstanceOf(ProviderSyncStatusUseCase.class);
     }
 
     @Test
