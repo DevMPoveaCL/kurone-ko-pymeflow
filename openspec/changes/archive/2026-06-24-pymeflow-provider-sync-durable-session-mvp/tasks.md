@@ -47,7 +47,11 @@ Chain strategy: stacked-to-main
 
 ## Phase 4: Web API Semantics (TDD)
 
-- [ ] 4.1 RED: Update `CashflowProviderSyncController` WebMvc tests for trigger/status responses reporting durable/persistent durability and safe not-found wording.
-- [ ] 4.2 RED: Add web test for persisted safe provider errors excluding credentials, stack traces, raw payloads, and internal exception details.
-- [ ] 4.3 GREEN: Modify `src/main/java/com/kuroneko/pymeflow/interfaces/web/CashflowProviderSyncController.java` DTO mapping/OpenAPI text from `IN_MEMORY` to durable semantics.
-- [ ] 4.4 VERIFY: Run `./gradlew.bat test --rerun-tasks` after each PR slice before marking tasks complete.
+- [x] 4.1 RED: Update `CashflowProviderSyncController` WebMvc tests for trigger/status responses reporting durable/persistent durability and safe not-found wording.
+- [x] 4.2 RED: Add web test for persisted safe provider errors excluding credentials, stack traces, raw payloads, and internal exception details.
+- [x] 4.3 GREEN: Modify `src/main/java/com/kuroneko/pymeflow/interfaces/web/CashflowProviderSyncController.java` DTO mapping/OpenAPI text from `IN_MEMORY` to durable semantics.
+- [x] 4.4 VERIFY: Run `./gradlew.bat test --rerun-tasks` after each PR slice before marking tasks complete.
+
+## Phase 5: Verification Fix (TDD)
+
+- [x] 5.1 RED/GREEN: Add focused JDBC integration coverage for missing `provider_sync_sessions` storage proving durable operations fail with `DataAccessException` instead of returning a false durable snapshot.
