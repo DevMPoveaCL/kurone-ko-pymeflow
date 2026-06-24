@@ -5,6 +5,7 @@ import com.kuroneko.pymeflow.application.port.out.SyncSessionPort;
 import com.kuroneko.pymeflow.domain.vertical.ProfileId;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.springframework.dao.DataAccessException;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.jdbc.datasource.DriverManagerDataSource;
 import org.springframework.jdbc.datasource.init.ResourceDatabasePopulator;
@@ -107,5 +108,23 @@ class JdbcSyncSessionAdapterTest {
                 where profile_id = ? and provider_type = ?
                 """, Integer.class, PROFILE_ID.value(), "fixture-provider"))
                 .isEqualTo(7);
+    }
+
+    @Test
+    void failsSafelyWhenDurableSessionStorageIsUnavailable() {
+        var dataSource = new DriverManagerDataSource(
+                "jdbc:h2:mem:provider_sync_session_missing_storage_" + java.util.UUID.randomUUID().toString().replace("-", "")
+                        + ";MODE=PostgreSQL;DATABASE_TO_LOWER=TRUE;DB_CLOSE_DELAY=-1",
+                "sa",
+                ""
+        );
+        var unmigratedAdapter = new JdbcSyncSessionAdapter(new JdbcTemplate(dataSource));
+
+        assertThatThrownBy(() -> unmigratedAdapter.syncId(PROFILE_ID, "fixture-provider"))
+                .isInstanceOf(DataAccessException.class)
+                .hasMessageContaining("provider_sync_sessions");
+        assertThatThrownBy(() -> unmigratedAdapter.findBySyncId("sync-missing-storage"))
+                .isInstanceOf(DataAccessException.class)
+                .hasMessageContaining("provider_sync_sessions");
     }
 }
