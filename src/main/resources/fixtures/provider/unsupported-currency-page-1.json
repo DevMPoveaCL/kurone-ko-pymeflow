@@ -1,0 +1,14 @@
+{
+  "nextCursor": null,
+  "totalPagesEstimate": 1,
+  "rateLimitResetsAt": null,
+  "entries": [
+    {
+      "externalReference": "USD-001",
+      "date": "2026-06-19",
+      "description": "Foreign transfer",
+      "signedAmount": 10.00,
+      "currency": "USD"
+    }
+  ]
+}

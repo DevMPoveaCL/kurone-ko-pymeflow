@@ -1,0 +1,25 @@
+{
+  "nextCursor": null,
+  "totalPagesEstimate": 1,
+  "rateLimitResetsAt": null,
+  "entries": [
+    {
+      "externalReference": "BE-001",
+      "date": "2026-06-18",
+      "description": "Supplier transfer",
+      "signedAmount": -42000.00,
+      "currency": "CLP",
+      "counterpartyName": "Proveedor Uno",
+      "accountAlias": "checking-main"
+    },
+    {
+      "externalReference": "BE-002",
+      "date": "2026-06-19",
+      "description": "Cash deposit",
+      "signedAmount": 63500.00,
+      "currency": "CLP",
+      "counterpartyName": "Cliente Caja",
+      "accountAlias": "checking-main"
+    }
+  ]
+}
