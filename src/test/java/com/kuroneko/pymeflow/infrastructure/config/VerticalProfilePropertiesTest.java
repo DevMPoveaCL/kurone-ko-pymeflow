@@ -1,10 +1,13 @@
 package com.kuroneko.pymeflow.infrastructure.config;
 
 import com.kuroneko.pymeflow.application.port.out.ProfileRegistryPort;
+import com.kuroneko.pymeflow.application.cashflow.ProviderSyncStatusUseCase;
+import com.kuroneko.pymeflow.application.cashflow.ProviderSyncUseCase;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.mock.mockito.MockBean;
+import org.springframework.jdbc.core.JdbcTemplate;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -16,6 +19,15 @@ class VerticalProfilePropertiesTest {
 
     @MockBean
     private ProfileRegistryPort profileRegistryPort;
+
+    @MockBean
+    private JdbcTemplate jdbcTemplate;
+
+    @MockBean
+    private ProviderSyncUseCase providerSyncUseCase;
+
+    @MockBean
+    private ProviderSyncStatusUseCase providerSyncStatusUseCase;
 
     @Autowired
     private VerticalProfileProperties properties;

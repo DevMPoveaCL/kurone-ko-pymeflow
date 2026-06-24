@@ -40,10 +40,10 @@ Chain strategy: stacked-to-main
 
 ## Phase 3: Application Wiring and Resume (TDD)
 
-- [ ] 3.1 RED: Update application/service tests proving a previous cursor is used after adapter restart and reports return durable status.
-- [ ] 3.2 GREEN: Modify `SyncSessionPort.java` to add `Durability.DURABLE` without framework dependencies; keep `IN_MEMORY` for focused tests.
-- [ ] 3.3 GREEN: Modify `ApplicationServiceConfiguration.java` to wire `JdbcSyncSessionAdapter`; keep `InMemorySyncSessionAdapter.java` unscanned/test-only.
-- [ ] 3.4 REFACTOR: Run existing ArchUnit tests and remove any application-to-infrastructure dependency leak.
+- [x] 3.1 RED: Update application/service tests proving a previous cursor is used after adapter restart and reports return durable status.
+- [x] 3.2 GREEN: Modify `SyncSessionPort.java` to add `Durability.DURABLE` without framework dependencies; keep `IN_MEMORY` for focused tests.
+- [x] 3.3 GREEN: Modify `ApplicationServiceConfiguration.java` to wire `JdbcSyncSessionAdapter`; keep `InMemorySyncSessionAdapter.java` unscanned/test-only.
+- [x] 3.4 REFACTOR: Run existing ArchUnit tests and remove any application-to-infrastructure dependency leak.
 
 ## Phase 4: Web API Semantics (TDD)
 
