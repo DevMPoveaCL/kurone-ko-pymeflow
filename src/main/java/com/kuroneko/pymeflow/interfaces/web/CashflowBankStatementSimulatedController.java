@@ -9,6 +9,8 @@ import com.kuroneko.pymeflow.domain.cashflow.Transaction;
 import com.kuroneko.pymeflow.domain.vertical.CashflowCategory;
 import com.kuroneko.pymeflow.domain.vertical.ProfileId;
 import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.media.Content;
+import io.swagger.v3.oas.annotations.media.ExampleObject;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -62,6 +64,32 @@ public class CashflowBankStatementSimulatedController {
             @ApiResponse(responseCode = "400", description = "Todas las filas fueron inválidas; se retornan errores por fila.")
     })
     public ResponseEntity<SimulatedBankStatementResponse> importSimulated(
+            @io.swagger.v3.oas.annotations.parameters.RequestBody(
+                    description = "Request payload for a simulated bank statement import.",
+                    content = @Content(
+                            mediaType = "application/json",
+                            examples = @ExampleObject(
+                                    name = "simulatedBankStatementImport",
+                                    value = """
+                                            {
+                                              "profileId": "pharmacy-cl",
+                                              "importLabel": "Cartola junio 2026",
+                                              "rows": [
+                                                {
+                                                  "bankTransactionId": "BT-100",
+                                                  "bookingDate": "2026-06-15",
+                                                  "description": "Venta POS",
+                                                  "amount": 125000,
+                                                  "currency": "CLP",
+                                                  "accountAlias": "Cuenta corriente",
+                                                  "counterpartyName": "Cliente mostrador"
+                                                }
+                                              ]
+                                            }
+                                            """
+                            )
+                    )
+            )
             @RequestBody SimulatedBankStatementRequest request
     ) {
         var errors = new ArrayList<RowErrorResponse>();

@@ -9,7 +9,10 @@ import com.kuroneko.pymeflow.domain.cashflow.Transaction;
 import com.kuroneko.pymeflow.domain.cashflow.TransactionDirection;
 import com.kuroneko.pymeflow.domain.vertical.CashflowCategory;
 import com.kuroneko.pymeflow.domain.vertical.CashflowDirection;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.media.ExampleObject;
+import io.swagger.v3.oas.annotations.parameters.RequestBody;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -42,6 +45,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 @WebMvcTest(CashflowBankStatementSimulatedController.class)
 class CashflowBankStatementSimulatedControllerTest {
     private static final String ENDPOINT = "/api/cashflow/imports/bank-statement/simulated";
+    private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
 
     @MockBean
     private ExternalStatementImportPort externalStatementImportPort;
@@ -431,6 +435,45 @@ class CashflowBankStatementSimulatedControllerTest {
         assertThat(operation.description())
                 .contains("Los montos con signo se normalizan a valores positivos")
                 .contains("la dirección del movimiento se conserva como DEBIT o CREDIT");
+    }
+
+    @Test
+    void documentsOpenApiRequestExampleWithRowLevelBookingDateAndAccountAlias() throws Exception {
+        var openApiRequestBody = requestBodyDocumentation();
+        var example = requestExample(openApiRequestBody);
+        var payload = OBJECT_MAPPER.readTree(example.value());
+
+        assertThat(openApiRequestBody.description()).contains("simulated bank statement");
+        assertThat(example.name()).isEqualTo("simulatedBankStatementImport");
+        assertThat(payload.path("rows").isArray()).isTrue();
+        assertThat(payload.path("rows")).hasSize(1);
+        assertThat(payload.path("rows").get(0).path("bookingDate").asText()).isEqualTo("2026-06-15");
+        assertThat(payload.path("rows").get(0).path("accountAlias").asText()).isEqualTo("Cuenta corriente");
+    }
+
+    @Test
+    void documentsOpenApiRequestExampleWithoutBookedAtOrRootAccountAlias() throws Exception {
+        var example = requestExample(requestBodyDocumentation());
+        var payload = OBJECT_MAPPER.readTree(example.value());
+
+        assertThat(payload.has("accountAlias")).isFalse();
+        assertThat(example.value()).doesNotContain("bookedAt");
+    }
+
+    private static RequestBody requestBodyDocumentation() throws NoSuchMethodException {
+        Method endpoint = CashflowBankStatementSimulatedController.class.getMethod(
+                "importSimulated",
+                CashflowBankStatementSimulatedController.SimulatedBankStatementRequest.class
+        );
+
+        var openApiRequestBody = endpoint.getParameters()[0]
+                .getAnnotation(RequestBody.class);
+        assertThat(openApiRequestBody).isNotNull();
+        return openApiRequestBody;
+    }
+
+    private static ExampleObject requestExample(RequestBody openApiRequestBody) {
+        return openApiRequestBody.content()[0].examples()[0];
     }
 
     private static CashflowIngestionService.CashflowIngestionResult emptyIngestionResult() {
