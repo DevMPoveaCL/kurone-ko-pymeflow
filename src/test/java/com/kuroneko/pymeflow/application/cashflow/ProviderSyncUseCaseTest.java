@@ -10,6 +10,7 @@ import com.kuroneko.pymeflow.application.port.out.ProviderSyncPage;
 import com.kuroneko.pymeflow.application.port.out.ProviderSyncQuery;
 import com.kuroneko.pymeflow.application.port.out.SyncSessionPort;
 import com.kuroneko.pymeflow.domain.vertical.ProfileId;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
 
@@ -43,6 +44,13 @@ class ProviderSyncUseCaseTest {
             2,
             25
     );
+
+    @BeforeEach
+    void setUpSessionDefaults() {
+        when(syncSessionPort.syncId(PROFILE_ID, AUTH.providerType())).thenReturn("sync-default-001");
+        when(syncSessionPort.lastSyncAt(PROFILE_ID, AUTH.providerType())).thenReturn(Optional.empty());
+        when(syncSessionPort.entryCount(PROFILE_ID, AUTH.providerType())).thenReturn(0);
+    }
 
     @Test
     void singlePageSyncImportsAllEntriesAndCompletesWithoutMorePages() {
@@ -203,6 +211,64 @@ class ProviderSyncUseCaseTest {
     }
 
     @Test
+    void recordsCompletedStatusSnapshotAfterSuccessfulSyncWithoutCredentialMaterial() {
+        when(syncSessionPort.syncId(PROFILE_ID, AUTH.providerType())).thenReturn("sync-safe-001");
+        when(syncSessionPort.findCursor(PROFILE_ID, AUTH.providerType())).thenReturn(Optional.empty());
+        when(syncSessionPort.lastSyncAt(PROFILE_ID, AUTH.providerType()))
+                .thenReturn(Optional.of(java.time.Instant.parse("2026-06-23T10:15:30Z")));
+        when(syncSessionPort.entryCount(PROFILE_ID, AUTH.providerType())).thenReturn(4);
+        when(bankProviderPort.fetchStatements(any(), any()))
+                .thenReturn(page(List.of(entry("EXT-1"), entry("EXT-2")), Optional.empty()));
+        when(importPort.importStatement(any())).thenReturn(ingestionResult(2, 0, 0));
+
+        var report = useCase.sync(command());
+
+        assertThat(report.syncId()).isEqualTo("sync-safe-001");
+        var snapshot = capturedSnapshot();
+        assertThat(snapshot.syncId()).isEqualTo("sync-safe-001");
+        assertThat(snapshot.profileId()).isEqualTo(PROFILE_ID);
+        assertThat(snapshot.providerType()).isEqualTo(AUTH.providerType());
+        assertThat(snapshot.status()).isEqualTo(SyncSessionPort.SyncStatus.COMPLETED);
+        assertThat(snapshot.pagesFetched()).isEqualTo(1);
+        assertThat(snapshot.entriesFetched()).isEqualTo(2);
+        assertThat(snapshot.importedEntries()).isEqualTo(2);
+        assertThat(snapshot.hasMorePages()).isFalse();
+        assertThat(snapshot.truncated()).isFalse();
+        assertThat(snapshot.authAborted()).isFalse();
+        assertThat(snapshot.errors()).isEmpty();
+        assertThat(snapshot.retryAfterSeconds()).isEmpty();
+        assertThat(snapshot.cursor()).isEmpty();
+        assertThat(snapshot.lastSyncAt()).contains(java.time.Instant.parse("2026-06-23T10:15:30Z"));
+        assertThat(snapshot.sessionEntryCount()).isEqualTo(4);
+        assertThat(snapshot.toString()).doesNotContain(AUTH.credentialRef());
+    }
+
+    @Test
+    void recordsFailedStatusSnapshotWithSafeRetryHintAndProviderErrorOnly() {
+        when(syncSessionPort.syncId(PROFILE_ID, AUTH.providerType())).thenReturn("sync-rate-limited-001");
+        when(syncSessionPort.findCursor(PROFILE_ID, AUTH.providerType())).thenReturn(Optional.empty());
+        when(syncSessionPort.lastSyncAt(PROFILE_ID, AUTH.providerType())).thenReturn(Optional.empty());
+        when(syncSessionPort.entryCount(PROFILE_ID, AUTH.providerType())).thenReturn(0);
+        var error = new ProviderError.RateLimitError(120, "Request limit reached");
+        when(bankProviderPort.fetchStatements(any(), any()))
+                .thenThrow(new ProviderSyncUseCase.ProviderSyncException(error));
+
+        var report = useCase.sync(command());
+
+        assertThat(report.retryAfterSeconds()).contains(120);
+        var snapshot = capturedSnapshot();
+        assertThat(snapshot.syncId()).isEqualTo("sync-rate-limited-001");
+        assertThat(snapshot.status()).isEqualTo(SyncSessionPort.SyncStatus.FAILED);
+        assertThat(snapshot.errors()).containsExactly(error);
+        assertThat(snapshot.retryAfterSeconds()).contains(120);
+        assertThat(snapshot.authAborted()).isFalse();
+        assertThat(snapshot.pagesFetched()).isZero();
+        assertThat(snapshot.toString())
+                .contains("Request limit reached")
+                .doesNotContain(AUTH.credentialRef());
+    }
+
+    @Test
     void sessionCursorIsUsedForResumeAndSavedAfterEachPage() {
         when(syncSessionPort.findCursor(PROFILE_ID, AUTH.providerType())).thenReturn(Optional.of("cursor-resume"));
         when(bankProviderPort.fetchStatements(any(), any()))
@@ -235,6 +301,12 @@ class ProviderSyncUseCaseTest {
         var captor = ArgumentCaptor.forClass(ProviderSyncQuery.class);
         verify(bankProviderPort).fetchStatements(captor.capture(), any());
         return captor.getAllValues();
+    }
+
+    private SyncSessionPort.SyncSessionSnapshot capturedSnapshot() {
+        var captor = ArgumentCaptor.forClass(SyncSessionPort.SyncSessionSnapshot.class);
+        verify(syncSessionPort).recordReport(captor.capture());
+        return captor.getValue();
     }
 
     private static ProviderSyncUseCase.ProviderSyncCommand command() {

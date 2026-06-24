@@ -11,6 +11,7 @@ import java.util.concurrent.ConcurrentMap;
 
 public final class InMemorySyncSessionAdapter implements SyncSessionPort {
     private final ConcurrentMap<SyncSessionKey, SyncSessionState> sessions = new ConcurrentHashMap<>();
+    private final ConcurrentMap<String, SyncSessionSnapshot> snapshots = new ConcurrentHashMap<>();
 
     @Override
     public String syncId(ProfileId profileId, String providerType) {
@@ -43,10 +44,27 @@ public final class InMemorySyncSessionAdapter implements SyncSessionPort {
         sessions.compute(new SyncSessionKey(profileId, providerType), (ignored, current) -> stateWithEntryCount(current, entryCount));
     }
 
-    int entryCount(ProfileId profileId, String providerType) {
+    @Override
+    public int entryCount(ProfileId profileId, String providerType) {
         return Optional.ofNullable(sessions.get(new SyncSessionKey(profileId, providerType)))
                 .map(SyncSessionState::entryCount)
                 .orElse(0);
+    }
+
+    @Override
+    public void recordReport(SyncSessionSnapshot snapshot) {
+        if (snapshot == null) {
+            throw new IllegalArgumentException("Sync session snapshot is required");
+        }
+        snapshots.put(snapshot.syncId(), snapshot);
+    }
+
+    @Override
+    public Optional<SyncSessionSnapshot> findBySyncId(String syncId) {
+        return Optional.ofNullable(syncId)
+                .map(String::trim)
+                .filter(value -> !value.isBlank())
+                .map(snapshots::get);
     }
 
     private static SyncSessionState stateWithCursor(SyncSessionState current, String cursor) {
