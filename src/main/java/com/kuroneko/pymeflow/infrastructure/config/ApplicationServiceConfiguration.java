@@ -14,6 +14,7 @@ import com.kuroneko.pymeflow.application.port.out.CashflowCategorizationPort;
 import com.kuroneko.pymeflow.application.port.out.CashflowMovementHistoryPort;
 import com.kuroneko.pymeflow.application.port.out.ExternalStatementImportPort;
 import com.kuroneko.pymeflow.application.port.out.ProfileRegistryPort;
+import com.kuroneko.pymeflow.application.port.out.ProviderSyncObservationPort;
 import com.kuroneko.pymeflow.application.port.out.SyncSessionPort;
 import com.kuroneko.pymeflow.application.recommendation.HistoryRecommendationService;
 import com.kuroneko.pymeflow.application.vertical.VerticalProfileService;
@@ -109,14 +110,31 @@ public class ApplicationServiceConfiguration {
             BankProviderPort bankProviderPort,
             ExternalStatementImportPort externalStatementImportPort,
             SyncSessionPort syncSessionPort,
+            ProviderSyncObservationPort providerSyncObservationPort,
             ProviderAuthConfig providerAuthConfig
     ) {
         return new ProviderSyncUseCase.ProviderSyncService(
                 bankProviderPort,
                 externalStatementImportPort,
                 syncSessionPort,
+                providerSyncObservationPort,
                 providerAuthConfig.maxPages(),
                 providerAuthConfig.pageSize()
+        );
+    }
+
+    ProviderSyncUseCase providerSyncUseCase(
+            BankProviderPort bankProviderPort,
+            ExternalStatementImportPort externalStatementImportPort,
+            SyncSessionPort syncSessionPort,
+            ProviderAuthConfig providerAuthConfig
+    ) {
+        return providerSyncUseCase(
+                bankProviderPort,
+                externalStatementImportPort,
+                syncSessionPort,
+                ProviderSyncObservationPort.noop(),
+                providerAuthConfig
         );
     }
 

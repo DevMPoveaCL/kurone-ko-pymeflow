@@ -42,6 +42,17 @@ class ArchitectureTest {
     }
 
     @Test
+    void domainAndApplicationDoNotDependOnFrameworkObservabilityLibraries() {
+        noClasses()
+                .that().resideInAnyPackage("..domain..", "..application..")
+                .should().dependOnClassesThat().resideInAnyPackage(
+                        "org.slf4j..",
+                        "ch.qos.logback..",
+                        "io.micrometer..")
+                .check(MAIN_CLASSES);
+    }
+
+    @Test
     void domainAndApplicationDoNotDependOnBankSpecificInfrastructure() {
         noClasses()
                 .that().resideInAnyPackage("..domain..", "..application..")

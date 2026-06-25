@@ -6,6 +6,7 @@ import com.kuroneko.pymeflow.application.port.out.ExternalStatementImportCommand
 import com.kuroneko.pymeflow.application.port.out.ExternalStatementImportPort;
 import com.kuroneko.pymeflow.application.port.out.ProviderAuth;
 import com.kuroneko.pymeflow.application.port.out.ProviderError;
+import com.kuroneko.pymeflow.application.port.out.ProviderSyncObservationPort;
 import com.kuroneko.pymeflow.application.port.out.ProviderSyncPage;
 import com.kuroneko.pymeflow.application.port.out.ProviderSyncQuery;
 import com.kuroneko.pymeflow.application.port.out.SyncSessionPort;
@@ -21,6 +22,7 @@ import java.util.List;
 import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
@@ -37,10 +39,12 @@ class ProviderSyncUseCaseTest {
     private final BankProviderPort bankProviderPort = mock(BankProviderPort.class);
     private final ExternalStatementImportPort importPort = mock(ExternalStatementImportPort.class);
     private final SyncSessionPort syncSessionPort = mock(SyncSessionPort.class);
+    private final ProviderSyncObservationPort observationPort = mock(ProviderSyncObservationPort.class);
     private final ProviderSyncUseCase useCase = new ProviderSyncUseCase.ProviderSyncService(
             bankProviderPort,
             importPort,
             syncSessionPort,
+            observationPort,
             2,
             25
     );
@@ -285,6 +289,99 @@ class ProviderSyncUseCaseTest {
         verify(syncSessionPort, times(2)).incrementEntryCount(PROFILE_ID, AUTH.providerType(), 1);
     }
 
+    @Test
+    void successfulSyncEmitsStartProgressAndCompletionObservationsWithSafeFieldsOnly() {
+        when(syncSessionPort.syncId(PROFILE_ID, AUTH.providerType())).thenReturn("sync-safe-observation-001");
+        when(syncSessionPort.findCursor(PROFILE_ID, AUTH.providerType())).thenReturn(Optional.of("secret-cursor"));
+        when(bankProviderPort.fetchStatements(any(), any()))
+                .thenReturn(page(List.of(entry("EXT-1")), Optional.of("cursor-next")))
+                .thenReturn(page(List.of(entry("EXT-2")), Optional.empty()));
+        when(importPort.importStatement(any())).thenReturn(ingestionResult(1, 0, 0));
+
+        useCase.sync(command());
+
+        var events = capturedObservations(4);
+        assertThat(events)
+                .extracting(ProviderSyncObservationPort.ProviderSyncObservation::event)
+                .containsExactly(
+                        ProviderSyncObservationPort.LifecycleEvent.STARTED,
+                        ProviderSyncObservationPort.LifecycleEvent.PAGE_FETCHED,
+                        ProviderSyncObservationPort.LifecycleEvent.PAGE_FETCHED,
+                        ProviderSyncObservationPort.LifecycleEvent.COMPLETED
+                );
+        assertThat(events)
+                .allSatisfy(event -> {
+                    assertThat(event.syncId()).isEqualTo("sync-safe-observation-001");
+                    assertThat(event.profileId()).isEqualTo(PROFILE_ID.value());
+                    assertThat(event.providerType()).isEqualTo(AUTH.providerType());
+                    assertThat(event.toString())
+                            .doesNotContain(AUTH.credentialRef())
+                            .doesNotContain("secret-cursor")
+                            .doesNotContain("cursor-next")
+                            .doesNotContain("EXT-1")
+                            .doesNotContain("EXT-2");
+                });
+        assertThat(events.getLast().status()).isEqualTo(ProviderSyncObservationPort.SyncStatus.COMPLETED);
+        assertThat(events.getLast().entriesFetched()).isEqualTo(2);
+        assertThat(events.getLast().importedEntries()).isEqualTo(2);
+        assertThat(events.getLast().errorCode()).isEqualTo(ProviderSyncObservationPort.ErrorCode.NONE);
+    }
+
+    @Test
+    void failedSyncEmitsSanitizedFailureObservationWithoutRawExceptionMessage() {
+        when(syncSessionPort.syncId(PROFILE_ID, AUTH.providerType())).thenReturn("sync-failure-observation-001");
+        when(syncSessionPort.findCursor(PROFILE_ID, AUTH.providerType())).thenReturn(Optional.empty());
+        var error = new ProviderError.RateLimitError(90, "raw provider said customer token abc123 exceeded quota");
+        when(bankProviderPort.fetchStatements(any(), any()))
+                .thenThrow(new ProviderSyncUseCase.ProviderSyncException(error));
+
+        useCase.sync(command());
+
+        var events = capturedObservations(2);
+        assertThat(events)
+                .extracting(ProviderSyncObservationPort.ProviderSyncObservation::event)
+                .containsExactly(
+                        ProviderSyncObservationPort.LifecycleEvent.STARTED,
+                        ProviderSyncObservationPort.LifecycleEvent.FAILED
+                );
+        var failure = events.getLast();
+        assertThat(failure.status()).isEqualTo(ProviderSyncObservationPort.SyncStatus.FAILED);
+        assertThat(failure.errorCode()).isEqualTo(ProviderSyncObservationPort.ErrorCode.RATE_LIMIT);
+        assertThat(failure.retryAfterSeconds()).contains(90);
+        assertThat(failure.toString())
+                .doesNotContain("raw provider said")
+                .doesNotContain("customer token")
+                .doesNotContain("abc123")
+                .doesNotContain(AUTH.credentialRef());
+    }
+
+    @Test
+    void unexpectedProviderFailureEmitsUnknownFailureObservationWithoutRawExceptionDetails() {
+        when(syncSessionPort.syncId(PROFILE_ID, AUTH.providerType())).thenReturn("sync-internal-failure-001");
+        when(syncSessionPort.findCursor(PROFILE_ID, AUTH.providerType())).thenReturn(Optional.empty());
+        when(bankProviderPort.fetchStatements(any(), any()))
+                .thenThrow(new IllegalStateException("raw stack detail for credential-ref token abc123"));
+
+        assertThatThrownBy(() -> useCase.sync(command()))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("raw stack detail");
+
+        var events = capturedObservations(2);
+        assertThat(events)
+                .extracting(ProviderSyncObservationPort.ProviderSyncObservation::event)
+                .containsExactly(
+                        ProviderSyncObservationPort.LifecycleEvent.STARTED,
+                        ProviderSyncObservationPort.LifecycleEvent.FAILED
+                );
+        var failure = events.getLast();
+        assertThat(failure.errorCode()).isEqualTo(ProviderSyncObservationPort.ErrorCode.UNKNOWN);
+        assertThat(failure.status()).isEqualTo(ProviderSyncObservationPort.SyncStatus.FAILED);
+        assertThat(failure.toString())
+                .doesNotContain("raw stack detail")
+                .doesNotContain("token abc123")
+                .doesNotContain(AUTH.credentialRef());
+    }
+
     private ExternalStatementImportCommand capturedImport() {
         var captor = ArgumentCaptor.forClass(ExternalStatementImportCommand.class);
         verify(importPort).importStatement(captor.capture());
@@ -307,6 +404,12 @@ class ProviderSyncUseCaseTest {
         var captor = ArgumentCaptor.forClass(SyncSessionPort.SyncSessionSnapshot.class);
         verify(syncSessionPort).recordReport(captor.capture());
         return captor.getValue();
+    }
+
+    private List<ProviderSyncObservationPort.ProviderSyncObservation> capturedObservations(int times) {
+        var captor = ArgumentCaptor.forClass(ProviderSyncObservationPort.ProviderSyncObservation.class);
+        verify(observationPort, times(times)).observe(captor.capture());
+        return captor.getAllValues();
     }
 
     private static ProviderSyncUseCase.ProviderSyncCommand command() {

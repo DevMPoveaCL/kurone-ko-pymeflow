@@ -5,10 +5,13 @@ import com.kuroneko.pymeflow.application.port.out.ExternalStatementImportCommand
 import com.kuroneko.pymeflow.application.port.out.ExternalStatementImportPort;
 import com.kuroneko.pymeflow.application.port.out.ProviderAuth;
 import com.kuroneko.pymeflow.application.port.out.ProviderError;
+import com.kuroneko.pymeflow.application.port.out.ProviderSyncObservationPort;
 import com.kuroneko.pymeflow.application.port.out.ProviderSyncQuery;
 import com.kuroneko.pymeflow.application.port.out.SyncSessionPort;
 import com.kuroneko.pymeflow.domain.vertical.ProfileId;
 
+import java.time.Duration;
+import java.time.Instant;
 import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.List;
@@ -96,6 +99,7 @@ public interface ProviderSyncUseCase {
         private final BankProviderPort bankProviderPort;
         private final ExternalStatementImportPort importPort;
         private final SyncSessionPort syncSessionPort;
+        private final ProviderSyncObservationPort observationPort;
         private final int maxPages;
         private final int pageSize;
 
@@ -103,6 +107,17 @@ public interface ProviderSyncUseCase {
                 BankProviderPort bankProviderPort,
                 ExternalStatementImportPort importPort,
                 SyncSessionPort syncSessionPort,
+                int maxPages,
+                int pageSize
+        ) {
+            this(bankProviderPort, importPort, syncSessionPort, ProviderSyncObservationPort.noop(), maxPages, pageSize);
+        }
+
+        public ProviderSyncService(
+                BankProviderPort bankProviderPort,
+                ExternalStatementImportPort importPort,
+                SyncSessionPort syncSessionPort,
+                ProviderSyncObservationPort observationPort,
                 int maxPages,
                 int pageSize
         ) {
@@ -115,6 +130,9 @@ public interface ProviderSyncUseCase {
             if (syncSessionPort == null) {
                 throw new IllegalArgumentException("Sync session port is required");
             }
+            if (observationPort == null) {
+                throw new IllegalArgumentException("Observation port is required");
+            }
             if (maxPages <= 0) {
                 throw new IllegalArgumentException("Max pages must be greater than zero");
             }
@@ -124,6 +142,7 @@ public interface ProviderSyncUseCase {
             this.bankProviderPort = bankProviderPort;
             this.importPort = importPort;
             this.syncSessionPort = syncSessionPort;
+            this.observationPort = observationPort;
             this.maxPages = maxPages;
             this.pageSize = pageSize;
         }
@@ -132,6 +151,7 @@ public interface ProviderSyncUseCase {
         public ProviderSyncReport sync(ProviderSyncCommand command) {
             var providerType = command.auth().providerType();
             var syncId = syncSessionPort.syncId(command.profileId(), providerType);
+            var startedAt = Instant.now();
             var cursor = syncSessionPort.findCursor(command.profileId(), providerType);
             var errors = new ArrayList<ProviderError>();
             var pagesFetched = 0;
@@ -142,41 +162,94 @@ public interface ProviderSyncUseCase {
             var attempts = 0;
             var stoppedAfterUnavailable = false;
 
-            while (attempts < maxPages) {
-                attempts++;
-                var query = new ProviderSyncQuery(
-                        command.profileId(),
-                        command.dateFrom(),
-                        command.dateTo(),
-                        cursor,
-                        pageSize
-                );
+            observationPort.observe(observation(
+                    ProviderSyncObservationPort.LifecycleEvent.STARTED,
+                    syncId,
+                    command.profileId(),
+                    providerType,
+                    ProviderSyncObservationPort.SyncStatus.STARTED,
+                    0,
+                    0,
+                    0,
+                    false,
+                    false,
+                    false,
+                    ProviderSyncObservationPort.ErrorCode.NONE,
+                    Optional.empty(),
+                    Optional.empty()
+            ));
 
-                try {
-                    var page = bankProviderPort.fetchStatements(query, command.auth());
-                    pagesFetched++;
-                    entriesFetched += page.entries().size();
-                    var importResult = importPort.importStatement(new ExternalStatementImportCommand(
+            try {
+                while (attempts < maxPages) {
+                    attempts++;
+                    var query = new ProviderSyncQuery(
                             command.profileId(),
-                            "provider-sync",
-                            page.entries()
-                    ));
-                    importedEntries += importedEntryCount(importResult);
-                    cursor = page.nextCursor();
-                    syncSessionPort.saveCursor(command.profileId(), providerType, cursor.orElse(""));
-                    syncSessionPort.incrementEntryCount(command.profileId(), providerType, page.entries().size());
-                    hasMorePages = cursor.isPresent();
-                    if (cursor.isEmpty()) {
-                        break;
+                            command.dateFrom(),
+                            command.dateTo(),
+                            cursor,
+                            pageSize
+                    );
+
+                    try {
+                        var page = bankProviderPort.fetchStatements(query, command.auth());
+                        pagesFetched++;
+                        entriesFetched += page.entries().size();
+                        var importResult = importPort.importStatement(new ExternalStatementImportCommand(
+                                command.profileId(),
+                                "provider-sync",
+                                page.entries()
+                        ));
+                        importedEntries += importedEntryCount(importResult);
+                        cursor = page.nextCursor();
+                        syncSessionPort.saveCursor(command.profileId(), providerType, cursor.orElse(""));
+                        syncSessionPort.incrementEntryCount(command.profileId(), providerType, page.entries().size());
+                        hasMorePages = cursor.isPresent();
+                        observationPort.observe(observation(
+                                ProviderSyncObservationPort.LifecycleEvent.PAGE_FETCHED,
+                                syncId,
+                                command.profileId(),
+                                providerType,
+                                ProviderSyncObservationPort.SyncStatus.IN_PROGRESS,
+                                pagesFetched,
+                                entriesFetched,
+                                importedEntries,
+                                hasMorePages,
+                                false,
+                                false,
+                                ProviderSyncObservationPort.ErrorCode.NONE,
+                                Optional.empty(),
+                                Optional.empty()
+                        ));
+                        if (cursor.isEmpty()) {
+                            break;
+                        }
+                    } catch (ProviderSyncException exception) {
+                        errors.add(exception.error());
+                        authAborted = exception.error() instanceof ProviderError.AuthError;
+                        if (authAborted || !(exception.error() instanceof ProviderError.UnavailableError)) {
+                            break;
+                        }
+                        stoppedAfterUnavailable = attempts == maxPages;
                     }
-                } catch (ProviderSyncException exception) {
-                    errors.add(exception.error());
-                    authAborted = exception.error() instanceof ProviderError.AuthError;
-                    if (authAborted || !(exception.error() instanceof ProviderError.UnavailableError)) {
-                        break;
-                    }
-                    stoppedAfterUnavailable = attempts == maxPages;
                 }
+            } catch (RuntimeException exception) {
+                observationPort.observe(observation(
+                        ProviderSyncObservationPort.LifecycleEvent.FAILED,
+                        syncId,
+                        command.profileId(),
+                        providerType,
+                        ProviderSyncObservationPort.SyncStatus.FAILED,
+                        pagesFetched,
+                        entriesFetched,
+                        importedEntries,
+                        hasMorePages,
+                        false,
+                        authAborted,
+                        ProviderSyncObservationPort.ErrorCode.UNKNOWN,
+                        Optional.empty(),
+                        Optional.of(Duration.between(startedAt, Instant.now()))
+                ));
+                throw exception;
             }
 
             var truncated = (hasMorePages || stoppedAfterUnavailable) && attempts == maxPages;
@@ -209,7 +282,87 @@ public interface ProviderSyncUseCase {
                     report.retryAfterSeconds(),
                     SyncSessionPort.Durability.IN_MEMORY
             ));
+            observationPort.observe(observation(
+                    terminalEvent(report),
+                    report.syncId(),
+                    command.profileId(),
+                    providerType,
+                    observationStatusFor(report),
+                    report.pagesFetched(),
+                    report.entriesFetched(),
+                    report.importedEntries(),
+                    report.hasMorePages(),
+                    report.truncated(),
+                    report.authAborted(),
+                    errorCodeFor(report.errors()),
+                    report.retryAfterSeconds(),
+                    Optional.of(Duration.between(startedAt, Instant.now()))
+            ));
             return report;
+        }
+
+        private static ProviderSyncObservationPort.ProviderSyncObservation observation(
+                ProviderSyncObservationPort.LifecycleEvent event,
+                String syncId,
+                ProfileId profileId,
+                String providerType,
+                ProviderSyncObservationPort.SyncStatus status,
+                int pagesFetched,
+                int entriesFetched,
+                int importedEntries,
+                boolean hasMorePages,
+                boolean truncated,
+                boolean authAborted,
+                ProviderSyncObservationPort.ErrorCode errorCode,
+                Optional<Integer> retryAfterSeconds,
+                Optional<Duration> duration
+        ) {
+            return new ProviderSyncObservationPort.ProviderSyncObservation(
+                    event,
+                    syncId,
+                    profileId.value(),
+                    providerType,
+                    status,
+                    pagesFetched,
+                    entriesFetched,
+                    importedEntries,
+                    hasMorePages,
+                    truncated,
+                    authAborted,
+                    errorCode,
+                    retryAfterSeconds,
+                    duration
+            );
+        }
+
+        private static ProviderSyncObservationPort.LifecycleEvent terminalEvent(ProviderSyncReport report) {
+            return statusFor(report) == SyncSessionPort.SyncStatus.FAILED
+                    ? ProviderSyncObservationPort.LifecycleEvent.FAILED
+                    : ProviderSyncObservationPort.LifecycleEvent.COMPLETED;
+        }
+
+        private static ProviderSyncObservationPort.SyncStatus observationStatusFor(ProviderSyncReport report) {
+            return switch (statusFor(report)) {
+                case COMPLETED -> ProviderSyncObservationPort.SyncStatus.COMPLETED;
+                case PARTIAL -> ProviderSyncObservationPort.SyncStatus.PARTIAL;
+                case FAILED -> ProviderSyncObservationPort.SyncStatus.FAILED;
+            };
+        }
+
+        private static ProviderSyncObservationPort.ErrorCode errorCodeFor(List<ProviderError> errors) {
+            return errors.stream()
+                    .findFirst()
+                    .map(ProviderSyncService::errorCodeFor)
+                    .orElse(ProviderSyncObservationPort.ErrorCode.NONE);
+        }
+
+        private static ProviderSyncObservationPort.ErrorCode errorCodeFor(ProviderError error) {
+            return switch (error) {
+                case ProviderError.AuthError ignored -> ProviderSyncObservationPort.ErrorCode.AUTH;
+                case ProviderError.RateLimitError ignored -> ProviderSyncObservationPort.ErrorCode.RATE_LIMIT;
+                case ProviderError.UnavailableError ignored -> ProviderSyncObservationPort.ErrorCode.UNAVAILABLE;
+                case ProviderError.DataError ignored -> ProviderSyncObservationPort.ErrorCode.DATA;
+            };
         }
 
         private static int importedEntryCount(CashflowIngestionService.CashflowIngestionResult result) {
