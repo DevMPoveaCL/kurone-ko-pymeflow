@@ -17,12 +17,16 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
 import org.springframework.boot.test.mock.mockito.MockBean;
 import org.springframework.http.MediaType;
+import org.springframework.web.bind.annotation.RequestMethod;
+import org.springframework.web.method.HandlerMethod;
+import org.springframework.web.servlet.mvc.method.annotation.RequestMappingHandlerMapping;
 import org.springframework.test.web.servlet.MockMvc;
 
 import java.lang.reflect.Method;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.util.List;
+import java.util.Locale;
 import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -51,6 +55,9 @@ class CashflowProviderSyncControllerTest {
 
     @Autowired
     private MockMvc mockMvc;
+
+    @Autowired
+    private RequestMappingHandlerMapping handlerMapping;
 
     @Test
     void postTriggersSyncAndReturnsSafeDurableReportWithoutCredentialEcho() throws Exception {
@@ -284,6 +291,25 @@ class CashflowProviderSyncControllerTest {
         assertThat(example.value()).doesNotContain("secret", "token", "password");
     }
 
+    @Test
+    void exposesOnlyTriggerAndStatusRoutesWithoutOperatorActionSurface() {
+        var providerSyncRoutes = handlerMapping.getHandlerMethods().entrySet().stream()
+                .filter(entry -> isProviderSyncController(entry.getValue()))
+                .flatMap(entry -> entry.getKey().getPatternValues().stream()
+                        .flatMap(pattern -> entry.getKey().getMethodsCondition().getMethods().stream()
+                                .map(method -> route(method, pattern))))
+                .collect(java.util.stream.Collectors.toSet());
+
+        assertThat(providerSyncRoutes)
+                .containsExactlyInAnyOrder(
+                        "POST /api/cashflow/provider-syncs",
+                        "GET /api/cashflow/provider-syncs/{syncId}"
+                );
+        assertThat(providerSyncRoutes)
+                .allSatisfy(route -> assertThat(route.toLowerCase(Locale.ROOT))
+                        .doesNotContain("list", "audit", "retry", "manual", "operator", "ui"));
+    }
+
     private ProviderSyncUseCase.ProviderSyncCommand capturedCommand() {
         var captor = ArgumentCaptor.forClass(ProviderSyncUseCase.ProviderSyncCommand.class);
         verify(providerSyncUseCase).sync(captor.capture());
@@ -293,6 +319,14 @@ class CashflowProviderSyncControllerTest {
     private static ExampleObject requestExample(RequestBody requestBody) {
         assertThat(requestBody).isNotNull();
         return requestBody.content()[0].examples()[0];
+    }
+
+    private static boolean isProviderSyncController(HandlerMethod handlerMethod) {
+        return handlerMethod.getBeanType().equals(CashflowProviderSyncController.class);
+    }
+
+    private static String route(RequestMethod method, String pattern) {
+        return method.name() + " " + pattern;
     }
 
     private static String validPayload(String providerType, String credentialRef) {
