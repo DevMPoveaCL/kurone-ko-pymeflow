@@ -1,0 +1,112 @@
+<!doctype html>
+<html lang="es-CL">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>PymeFlow | Cockpit de caja diaria</title>
+    <meta name="description" content="Cockpit estático para revisar caja diaria, abonos, cargos y sincronizaciones fixture/demo de PymeFlow.">
+    <link rel="stylesheet" href="/styles.css">
+    <script src="/app.js" defer></script>
+</head>
+<body>
+    <a class="skip-link" href="#contenido">Saltar al contenido principal</a>
+
+    <header class="topbar" aria-label="Identidad del producto">
+        <div>
+            <p class="eyebrow">PymeFlow · MVP cockpit</p>
+            <h1>Caja diaria para PyMEs chilenas</h1>
+            <p class="lead">Una vista operativa para revisar abonos, cargos, cartola y comprobantes de sincronización simulada.</p>
+        </div>
+        <aside class="status-note" aria-label="Alcance de conectividad">
+            <strong>Modo seguro demo</strong>
+            <span>Sincronización fixture/demo. No representa conectividad bancaria real.</span>
+        </aside>
+    </header>
+
+    <nav class="quick-nav" aria-label="Secciones del cockpit">
+        <a href="#caja">Caja</a>
+        <a href="#comprobantes">Comprobantes</a>
+        <a href="#cartola">Cartola</a>
+        <a href="#revision">Revisión</a>
+    </nav>
+
+    <main id="contenido" class="cockpit" tabindex="-1">
+        <section id="caja" class="hero-ledger" aria-label="Resumen de caja diaria" data-api-target="cash-summary">
+            <div class="cash-card cash-card--primary" data-summary="balance">
+                <p class="card-label">Caja proyectada de hoy</p>
+                <p class="amount" data-field="projected-balance">Sin datos</p>
+                <p class="card-copy" data-field="profile-label">Cargando perfil activo y movimientos projection-ready.</p>
+            </div>
+
+            <div class="cash-card" data-summary="credit">
+                <p class="card-label">Abonos visibles</p>
+                <p class="amount amount--credit" data-field="credit-total">Sin datos</p>
+                <p class="card-copy">Entradas positivas en CLP con dirección CREDIT.</p>
+            </div>
+
+            <div class="cash-card" data-summary="debit">
+                <p class="card-label">Cargos por revisar</p>
+                <p class="amount amount--debit" data-field="debit-total">Sin datos</p>
+                <p class="card-copy">Salidas positivas en CLP con dirección DEBIT.</p>
+            </div>
+        </section>
+
+        <section class="actions-panel" aria-label="Acciones principales del cockpit" data-api-target="actions-panel">
+            <div>
+                <p class="eyebrow">Flujo seguro MVP</p>
+                <h2>Revisión antes de proyectar caja</h2>
+                <p>Estas acciones llaman APIs same-origin existentes con datos fixture/demo para evidenciar importación, historial y sync segura.</p>
+            </div>
+            <div class="button-row" aria-label="Acciones de caja">
+                <button type="button" data-action="manual-import">Revisar abonos y cargos con muestra manual</button>
+                <button type="button" class="button-secondary" data-action="provider-sync">Ejecutar sync fixture</button>
+            </div>
+        </section>
+
+        <div class="workbench">
+            <section id="comprobantes" class="receipt-rail" aria-label="Riel de comprobantes de sincronización">
+                <div class="section-heading">
+                    <p class="eyebrow">Comprobantes</p>
+                    <h2>Sincronización fixture/demo</h2>
+                    <p>Riel tipo boleta para dejar evidencia visible sin exponer datos técnicos sensibles del proveedor.</p>
+                </div>
+
+                <article class="receipt" aria-labelledby="sync-title" data-api-target="sync-receipt" aria-live="polite">
+                    <span class="stamp">Demo</span>
+                    <h3 id="sync-title">Sync proveedor simulado</h3>
+                    <div class="state-line" role="status">Sin datos para mostrar. Ejecuta una sync fixture para ver estado durable.</div>
+                </article>
+
+                <article class="receipt receipt--quiet" aria-labelledby="import-title" data-api-target="import-receipt" aria-live="polite">
+                    <span class="stamp stamp--amber">Revisión</span>
+                    <h3 id="import-title">Importación manual pendiente</h3>
+                    <div class="state-line" role="status">Sin datos para mostrar. Importa la muestra para ver aceptados, revisión, rechazados e inválidos.</div>
+                </article>
+            </section>
+
+            <section id="cartola" class="ledger-panel" aria-label="Cartola de movimientos">
+                <div class="section-heading">
+                    <p class="eyebrow">Cartola</p>
+                    <h2>Cartola de movimientos</h2>
+                    <p>Filas estáticas para validar dirección de movimiento, monto CLP positivo e historia de caja.</p>
+                </div>
+
+                <div class="ledger-list" role="list" aria-label="Movimientos de caja" data-api-target="ledger-list" aria-live="polite">
+                    <div class="empty-state" role="status">Cargando historial projection-ready y revisión manual.</div>
+                </div>
+            </section>
+        </div>
+
+        <section id="revision" class="review-panel" aria-label="Revisión manual y estados seguros">
+            <div>
+                <p class="eyebrow">Revisión</p>
+                <h2>Movimientos que requieren decisión</h2>
+                <p>Si una API devuelve vacío o error seguro, esta zona mantendrá el resto del cockpit utilizable.</p>
+            </div>
+            <div class="empty-state" role="status" data-api-target="review-list" aria-live="polite">
+                Cargando recomendaciones, historial projection-ready y revisión manual.
+            </div>
+        </section>
+    </main>
+</body>
+</html>
