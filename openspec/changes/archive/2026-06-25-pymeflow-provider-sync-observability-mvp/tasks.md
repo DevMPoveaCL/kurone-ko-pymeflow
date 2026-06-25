@@ -9,11 +9,11 @@
 | Chained PRs recommended | Yes |
 | Suggested split | PR 1 observation port + safe logs + metrics + tests; PR 2 actuator health/info + tests/docs |
 | Delivery strategy | auto-chain |
-| Chain strategy | pending |
+| Chain strategy | feature-branch-chain |
 
 Decision needed before apply: Yes
 Chained PRs recommended: Yes
-Chain strategy: pending
+Chain strategy: feature-branch-chain
 400-line budget risk: High
 
 ### Suggested Work Units
@@ -38,16 +38,16 @@ Chain strategy: pending
 
 ## Phase 3: RED Tests for Actuator Boundary
 
-- [ ] 3.1 Create failing `src/test/java/com/kuroneko/pymeflow/infrastructure/observability/ProviderSyncStorageHealthIndicatorTest.java` for reachable/unreachable `provider_sync_sessions` health only.
-- [ ] 3.2 Create failing `src/test/java/com/kuroneko/pymeflow/infrastructure/observability/ProviderSyncInfoContributorTest.java` for safe capability metadata and no provider connectivity claim.
+- [x] 3.1 Create failing `src/test/java/com/kuroneko/pymeflow/infrastructure/observability/ProviderSyncStorageHealthIndicatorTest.java` for reachable/unreachable `provider_sync_sessions` health only.
+- [x] 3.2 Create failing `src/test/java/com/kuroneko/pymeflow/infrastructure/observability/ProviderSyncInfoContributorTest.java` for safe capability metadata and no provider connectivity claim.
 
 ## Phase 4: GREEN Actuator Implementation
 
-- [ ] 4.1 Create `src/main/java/com/kuroneko/pymeflow/infrastructure/observability/ProviderSyncStorageHealthIndicator.java` using `JdbcTemplate` against `provider_sync_sessions` only.
-- [ ] 4.2 Create `src/main/java/com/kuroneko/pymeflow/infrastructure/observability/ProviderSyncInfoContributor.java` with storage/capability metadata only.
-- [ ] 4.3 Verify no UI, list/audit API, retry, credential, or real provider dependency is introduced.
+- [x] 4.1 Create `src/main/java/com/kuroneko/pymeflow/infrastructure/observability/ProviderSyncStorageHealthIndicator.java` using `JdbcTemplate` against `provider_sync_sessions` only.
+- [x] 4.2 Create `src/main/java/com/kuroneko/pymeflow/infrastructure/observability/ProviderSyncInfoContributor.java` with storage/capability metadata only.
+- [x] 4.3 Verify no UI, list/audit API, retry, credential, or real provider dependency is introduced.
 
 ## Phase 5: Verification / Refactor
 
-- [ ] 5.1 Run `./gradlew.bat test --rerun-tasks` and keep tests with each work-unit commit.
-- [ ] 5.2 Refactor names/package boundaries only after green tests; keep application free of infrastructure imports.
+- [x] 5.1 Run `./gradlew.bat test --rerun-tasks` and keep tests with each work-unit commit.
+- [x] 5.2 Refactor names/package boundaries only after green tests; keep application free of infrastructure imports.
