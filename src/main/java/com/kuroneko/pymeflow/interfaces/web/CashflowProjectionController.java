@@ -4,6 +4,7 @@ import com.kuroneko.pymeflow.application.cashflow.AppliedObligation;
 import com.kuroneko.pymeflow.application.cashflow.CashflowProjectionCommand;
 import com.kuroneko.pymeflow.application.cashflow.CashflowProjectionResult;
 import com.kuroneko.pymeflow.application.cashflow.CashflowProjectionService;
+import com.kuroneko.pymeflow.application.cashflow.CockpitProjectionService;
 import com.kuroneko.pymeflow.application.cashflow.DailyProjectedBalance;
 import com.kuroneko.pymeflow.application.cashflow.ProjectedCashflowTransaction;
 import com.kuroneko.pymeflow.application.cashflow.ProjectionAlert;
@@ -13,16 +14,21 @@ import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.media.Schema;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
+import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotEmpty;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Pattern;
 import jakarta.validation.constraints.Positive;
 import jakarta.validation.constraints.PositiveOrZero;
+import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.ResponseEntity;
+import org.springframework.validation.annotation.Validated;
+import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.math.BigDecimal;
@@ -31,19 +37,25 @@ import java.util.Currency;
 import java.util.List;
 
 @RestController
-@RequestMapping("/api/cashflow/projections")
+@RequestMapping("/api/cashflow")
 @Tag(name = "Cashflow projections")
+@Validated
 public class CashflowProjectionController {
     private static final String PROJECTABLE = "PROJECTABLE";
     private static final String CATEGORIZED = "CATEGORIZED";
 
     private final CashflowProjectionService cashflowProjectionService;
+    private final CockpitProjectionService cockpitProjectionService;
 
-    public CashflowProjectionController(CashflowProjectionService cashflowProjectionService) {
+    public CashflowProjectionController(
+            CashflowProjectionService cashflowProjectionService,
+            CockpitProjectionService cockpitProjectionService
+    ) {
         this.cashflowProjectionService = cashflowProjectionService;
+        this.cockpitProjectionService = cockpitProjectionService;
     }
 
-    @PostMapping
+    @PostMapping("/projections")
     @Operation(
             summary = "Proyectar flujo de caja",
             description = "Calcula una proyección transitoria desde transacciones categorizadas, sin persistir movimientos."
@@ -51,6 +63,41 @@ public class CashflowProjectionController {
     public ResponseEntity<CashflowProjectionResponse> project(@Valid @RequestBody CashflowProjectionRequest request) {
         validateInterfaceRules(request);
         return ResponseEntity.ok(CashflowProjectionResponse.from(cashflowProjectionService.project(request.toCommand())));
+    }
+
+    @GetMapping("/cockpit/projection")
+    @Operation(
+            summary = "Proyectar flujo de caja del cockpit",
+            description = "Calcula una proyección desde movimientos PROJECTABLE persistidos, sin persistir cambios. Horizonte máximo MVP: 90 días."
+    )
+    public ResponseEntity<CashflowProjectionResponse> cockpitProjection(
+            @RequestParam(required = false)
+            @NotBlank(message = "El perfil es obligatorio.")
+            String profileId,
+
+            @RequestParam(required = false)
+            @NotNull(message = "El saldo inicial es obligatorio.")
+            @PositiveOrZero(message = "El saldo inicial no puede ser negativo.")
+            BigDecimal openingBalance,
+
+            @RequestParam(required = false)
+            @NotNull(message = "La fecha de inicio es obligatoria.")
+            @DateTimeFormat(iso = DateTimeFormat.ISO.DATE)
+            LocalDate startDate,
+
+            @RequestParam(required = false)
+            @NotNull(message = "El horizonte es obligatorio.")
+            @Positive(message = "El horizonte debe ser mayor que cero.")
+            @Max(value = CockpitProjectionService.MAX_HORIZON_DAYS, message = "El horizonte no puede superar 90 días.")
+            Integer horizonDays
+    ) {
+        var result = cockpitProjectionService.projectFromHistory(
+                new ProfileId(profileId),
+                openingBalance,
+                startDate,
+                horizonDays
+        );
+        return ResponseEntity.ok(CashflowProjectionResponse.from(result));
     }
 
     private static void validateInterfaceRules(CashflowProjectionRequest request) {

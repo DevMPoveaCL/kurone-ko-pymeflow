@@ -1,10 +1,13 @@
 package com.kuroneko.pymeflow.interfaces.web;
 
+import jakarta.validation.ConstraintViolationException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.MissingServletRequestParameterException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
+import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
 
 import java.util.Comparator;
 import java.util.List;
@@ -37,6 +40,38 @@ public class ApiExceptionHandler {
         ));
     }
 
+    @ExceptionHandler(ConstraintViolationException.class)
+    ResponseEntity<ApiErrorResponse> handleConstraintViolation(ConstraintViolationException exception) {
+        var errors = exception.getConstraintViolations().stream()
+                .map(violation -> new ValidationErrorResponse(fieldName(violation.getPropertyPath().toString()), violation.getMessage()))
+                .sorted(Comparator.comparing(ValidationErrorResponse::field))
+                .toList();
+
+        return ResponseEntity.badRequest().body(new ApiErrorResponse(
+                "VALIDATION_ERROR",
+                "Revise los datos enviados e intente nuevamente.",
+                errors
+        ));
+    }
+
+    @ExceptionHandler(MissingServletRequestParameterException.class)
+    ResponseEntity<ApiErrorResponse> handleMissingRequestParameter(MissingServletRequestParameterException exception) {
+        return ResponseEntity.badRequest().body(new ApiErrorResponse(
+                "VALIDATION_ERROR",
+                "Revise los datos enviados e intente nuevamente.",
+                List.of(new ValidationErrorResponse(exception.getParameterName(), requiredMessageFor(exception.getParameterName())))
+        ));
+    }
+
+    @ExceptionHandler(MethodArgumentTypeMismatchException.class)
+    ResponseEntity<ApiErrorResponse> handleTypeMismatch(MethodArgumentTypeMismatchException exception) {
+        return ResponseEntity.badRequest().body(new ApiErrorResponse(
+                "VALIDATION_ERROR",
+                "Revise los datos enviados e intente nuevamente.",
+                List.of(new ValidationErrorResponse(exception.getName(), invalidMessageFor(exception.getName())))
+        ));
+    }
+
     @ExceptionHandler(IllegalArgumentException.class)
     ResponseEntity<ApiErrorResponse> handleIllegalArgument(IllegalArgumentException exception) {
         return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(new ApiErrorResponse(
@@ -50,6 +85,9 @@ public class ApiExceptionHandler {
         var message = exception.getMessage();
         if (message == null) {
             return "No fue posible procesar la solicitud con los datos enviados.";
+        }
+        if (message.contains("horizonte no puede superar")) {
+            return "El horizonte no puede superar 90 días.";
         }
         if (message.startsWith("Profile not found")) {
             return "El perfil solicitado no está configurado.";
@@ -94,6 +132,33 @@ public class ApiExceptionHandler {
             return "La fecha de las transacciones debe estar dentro del horizonte de proyección.";
         }
         return "No fue posible procesar la solicitud con los datos enviados.";
+    }
+
+    private static String fieldName(String propertyPath) {
+        var dotIndex = propertyPath.lastIndexOf('.');
+        if (dotIndex < 0 || dotIndex == propertyPath.length() - 1) {
+            return propertyPath;
+        }
+        return propertyPath.substring(dotIndex + 1);
+    }
+
+    private static String requiredMessageFor(String parameterName) {
+        return switch (parameterName) {
+            case "profileId" -> "El perfil es obligatorio.";
+            case "openingBalance" -> "El saldo inicial es obligatorio.";
+            case "startDate" -> "La fecha de inicio es obligatoria.";
+            case "horizonDays" -> "El horizonte es obligatorio.";
+            default -> "El parámetro es obligatorio.";
+        };
+    }
+
+    private static String invalidMessageFor(String parameterName) {
+        return switch (parameterName) {
+            case "openingBalance" -> "El saldo inicial debe ser numérico.";
+            case "startDate" -> "La fecha de inicio debe tener formato ISO yyyy-MM-dd.";
+            case "horizonDays" -> "El horizonte debe ser un número entero.";
+            default -> "El parámetro enviado no tiene un formato válido.";
+        };
     }
 
     public record ApiErrorResponse(String code, String message, List<ValidationErrorResponse> errors) {

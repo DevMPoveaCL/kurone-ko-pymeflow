@@ -3,6 +3,7 @@ package com.kuroneko.pymeflow.interfaces.web;
 import com.kuroneko.pymeflow.application.cashflow.AppliedObligation;
 import com.kuroneko.pymeflow.application.cashflow.CashflowProjectionResult;
 import com.kuroneko.pymeflow.application.cashflow.CashflowProjectionService;
+import com.kuroneko.pymeflow.application.cashflow.CockpitProjectionService;
 import com.kuroneko.pymeflow.application.cashflow.DailyProjectedBalance;
 import com.kuroneko.pymeflow.application.cashflow.ProjectionAlert;
 import com.kuroneko.pymeflow.domain.cashflow.TransactionDirection;
@@ -25,6 +26,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -34,6 +36,9 @@ class CashflowProjectionControllerTest {
 
     @MockBean
     private CashflowProjectionService cashflowProjectionService;
+
+    @MockBean
+    private CockpitProjectionService cockpitProjectionService;
 
     @Autowired
     private MockMvc mockMvc;
@@ -207,6 +212,89 @@ class CashflowProjectionControllerTest {
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.message")
                         .value("La moneda de las transacciones debe coincidir con la moneda de la proyección."));
+    }
+
+    @Test
+    void returnsCockpitProjectionResponseFromPersistedProjectableMovements() throws Exception {
+        when(cockpitProjectionService.projectFromHistory(any(), any(), any(), org.mockito.ArgumentMatchers.eq(7)))
+                .thenReturn(new CashflowProjectionResult(
+                        List.of(new DailyProjectedBalance(
+                                LocalDate.of(2026, 6, 1),
+                                BigDecimal.valueOf(50_000),
+                                BigDecimal.ZERO,
+                                BigDecimal.ZERO,
+                                BigDecimal.valueOf(150_000)
+                        )),
+                        BigDecimal.valueOf(150_000),
+                        List.of(),
+                        List.of(new ProjectionAlert("healthy", "continue", "projected_balance_above_threshold", LocalDate.of(2026, 6, 1), BigDecimal.valueOf(150_000)))
+                ));
+
+        mockMvc.perform(get("/api/cashflow/cockpit/projection")
+                        .param("profileId", "pharmacy-cl")
+                        .param("openingBalance", "100000")
+                        .param("startDate", "2026-06-01")
+                        .param("horizonDays", "7"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.dailyBalances[0].date").value("2026-06-01"))
+                .andExpect(jsonPath("$.dailyBalances[0].inflows").value(50000))
+                .andExpect(jsonPath("$.closingProjectedBalance").value(150000))
+                .andExpect(jsonPath("$.alerts[0].ruleKey").value("healthy"));
+    }
+
+    @Test
+    void returnsEmptyCockpitProjectionWhenNoProjectableMovementsExist() throws Exception {
+        when(cockpitProjectionService.projectFromHistory(any(), any(), any(), org.mockito.ArgumentMatchers.eq(30)))
+                .thenReturn(new CashflowProjectionResult(List.of(), BigDecimal.valueOf(100_000), List.of(), List.of()));
+
+        mockMvc.perform(get("/api/cashflow/cockpit/projection")
+                        .param("profileId", "pharmacy-cl")
+                        .param("openingBalance", "100000")
+                        .param("startDate", "2026-06-01")
+                        .param("horizonDays", "30"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.dailyBalances").isEmpty())
+                .andExpect(jsonPath("$.closingProjectedBalance").value(100000))
+                .andExpect(jsonPath("$.appliedObligations").isEmpty())
+                .andExpect(jsonPath("$.alerts").isEmpty());
+    }
+
+    @Test
+    void returnsValidationErrorsInSpanishForInvalidCockpitProjectionParams() throws Exception {
+        mockMvc.perform(get("/api/cashflow/cockpit/projection")
+                        .param("profileId", " ")
+                        .param("openingBalance", "-1")
+                        .param("startDate", "2026-06-01")
+                        .param("horizonDays", "0"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("VALIDATION_ERROR"))
+                .andExpect(content().string(containsString("El perfil es obligatorio.")))
+                .andExpect(content().string(containsString("El saldo inicial no puede ser negativo.")))
+                .andExpect(content().string(containsString("El horizonte debe ser mayor que cero.")));
+    }
+
+    @Test
+    void returnsValidationErrorWhenCockpitProjectionHorizonExceedsMvpCap() throws Exception {
+        mockMvc.perform(get("/api/cashflow/cockpit/projection")
+                        .param("profileId", "pharmacy-cl")
+                        .param("openingBalance", "100000")
+                        .param("startDate", "2026-06-01")
+                        .param("horizonDays", "91"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("VALIDATION_ERROR"))
+                .andExpect(jsonPath("$.errors[?(@.field == 'horizonDays')].message")
+                        .value("El horizonte no puede superar 90 días."));
+    }
+
+    @Test
+    void returnsValidationErrorsInSpanishForMissingCockpitProjectionParams() throws Exception {
+        mockMvc.perform(get("/api/cashflow/cockpit/projection"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("VALIDATION_ERROR"))
+                .andExpect(content().string(containsString("El perfil es obligatorio.")))
+                .andExpect(content().string(containsString("El saldo inicial es obligatorio.")))
+                .andExpect(content().string(containsString("La fecha de inicio es obligatoria.")))
+                .andExpect(content().string(containsString("El horizonte es obligatorio.")));
     }
 
     private static String validPayload() {

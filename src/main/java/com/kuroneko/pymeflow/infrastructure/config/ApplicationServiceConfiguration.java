@@ -3,6 +3,7 @@ package com.kuroneko.pymeflow.infrastructure.config;
 import com.kuroneko.pymeflow.application.cashflow.CashflowIngestionService;
 import com.kuroneko.pymeflow.application.cashflow.CashflowMovementHistoryService;
 import com.kuroneko.pymeflow.application.cashflow.CashflowProjectionService;
+import com.kuroneko.pymeflow.application.cashflow.CockpitProjectionService;
 import com.kuroneko.pymeflow.application.cashflow.ManualReviewResolutionService;
 import com.kuroneko.pymeflow.application.cashflow.ProviderSyncStatusUseCase;
 import com.kuroneko.pymeflow.application.cashflow.ProviderSyncUseCase;
@@ -58,6 +59,14 @@ public class ApplicationServiceConfiguration {
     @Bean
     CashflowProjectionService cashflowProjectionService(VerticalProfileService verticalProfileService) {
         return new CashflowProjectionService(verticalProfileService);
+    }
+
+    @Bean
+    CockpitProjectionService cockpitProjectionService(
+            CashflowMovementHistoryService cashflowMovementHistoryService,
+            CashflowProjectionService cashflowProjectionService
+    ) {
+        return new CockpitProjectionService(cashflowMovementHistoryService, cashflowProjectionService);
     }
 
     @Bean
