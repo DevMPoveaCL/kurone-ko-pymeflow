@@ -8,11 +8,13 @@ import com.kuroneko.pymeflow.application.cashflow.ManualReviewResolutionService;
 import com.kuroneko.pymeflow.application.cashflow.ProviderSyncStatusUseCase;
 import com.kuroneko.pymeflow.application.cashflow.ProviderSyncUseCase;
 import com.kuroneko.pymeflow.application.cashflow.SensitiveDataPolicy;
+import com.kuroneko.pymeflow.application.cockpit.CockpitPreferencesService;
 import com.kuroneko.pymeflow.application.export.AccountantExportService;
 import com.kuroneko.pymeflow.application.port.out.AccountantExportPort;
 import com.kuroneko.pymeflow.application.port.out.BankProviderPort;
 import com.kuroneko.pymeflow.application.port.out.CashflowCategorizationPort;
 import com.kuroneko.pymeflow.application.port.out.CashflowMovementHistoryPort;
+import com.kuroneko.pymeflow.application.port.out.CockpitPreferencesPort;
 import com.kuroneko.pymeflow.application.port.out.ExternalStatementImportPort;
 import com.kuroneko.pymeflow.application.port.out.ProfileRegistryPort;
 import com.kuroneko.pymeflow.application.port.out.ProviderSyncObservationPort;
@@ -20,6 +22,7 @@ import com.kuroneko.pymeflow.application.port.out.SyncSessionPort;
 import com.kuroneko.pymeflow.application.recommendation.HistoryRecommendationService;
 import com.kuroneko.pymeflow.application.vertical.VerticalProfileService;
 import com.kuroneko.pymeflow.infrastructure.bank.SimulatedBankStatementAdapter;
+import com.kuroneko.pymeflow.infrastructure.persistence.JdbcCockpitPreferencesAdapter;
 import com.kuroneko.pymeflow.infrastructure.persistence.JdbcSyncSessionAdapter;
 import com.kuroneko.pymeflow.infrastructure.provider.FakeBankProviderAdapter;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnBean;
@@ -112,6 +115,16 @@ public class ApplicationServiceConfiguration {
     @Bean
     SyncSessionPort syncSessionPort(JdbcTemplate jdbcTemplate) {
         return new JdbcSyncSessionAdapter(jdbcTemplate);
+    }
+
+    @Bean
+    CockpitPreferencesPort cockpitPreferencesPort(JdbcTemplate jdbcTemplate) {
+        return new JdbcCockpitPreferencesAdapter(jdbcTemplate);
+    }
+
+    @Bean
+    CockpitPreferencesService cockpitPreferencesService(CockpitPreferencesPort cockpitPreferencesPort) {
+        return new CockpitPreferencesService(cockpitPreferencesPort);
     }
 
     @Bean
