@@ -7,6 +7,7 @@ import org.springframework.web.bind.MissingServletRequestParameterException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
+import org.springframework.http.converter.HttpMessageNotReadableException;
 import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
 
 import java.util.Comparator;
@@ -69,6 +70,15 @@ public class ApiExceptionHandler {
                 "VALIDATION_ERROR",
                 "Revise los datos enviados e intente nuevamente.",
                 List.of(new ValidationErrorResponse(exception.getName(), invalidMessageFor(exception.getName())))
+        ));
+    }
+
+    @ExceptionHandler(HttpMessageNotReadableException.class)
+    ResponseEntity<ApiErrorResponse> handleUnreadableBody(HttpMessageNotReadableException exception) {
+        return ResponseEntity.badRequest().body(new ApiErrorResponse(
+                "VALIDATION_ERROR",
+                "Revise los datos enviados e intente nuevamente.",
+                List.of(new ValidationErrorResponse(unreadableField(exception), unreadableMessage(exception)))
         ));
     }
 
@@ -159,6 +169,22 @@ public class ApiExceptionHandler {
             case "horizonDays" -> "El horizonte debe ser un número entero.";
             default -> "El parámetro enviado no tiene un formato válido.";
         };
+    }
+
+    private static String unreadableField(HttpMessageNotReadableException exception) {
+        var message = exception.getMostSpecificCause().getMessage();
+        if (message != null && message.contains("openingBalance")) {
+            return "openingBalance";
+        }
+        return "body";
+    }
+
+    private static String unreadableMessage(HttpMessageNotReadableException exception) {
+        var message = exception.getMostSpecificCause().getMessage();
+        if (message != null && message.contains("openingBalance")) {
+            return "El saldo inicial debe ser numérico.";
+        }
+        return "El cuerpo de la solicitud no tiene un formato válido.";
     }
 
     public record ApiErrorResponse(String code, String message, List<ValidationErrorResponse> errors) {

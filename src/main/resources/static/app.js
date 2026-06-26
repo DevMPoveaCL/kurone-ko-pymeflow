@@ -8,6 +8,7 @@
         manualReview: `/api/cashflow/history/manual-review?profileId=${PROFILE_ID}`,
         projectionReady: `/api/cashflow/history/projection-ready?profileId=${PROFILE_ID}`,
         cockpitProjection: "/api/cashflow/cockpit/projection",
+        cockpitPreferences: `/api/cashflow/cockpit/preferences?profileId=${PROFILE_ID}`,
         recommendations: `/api/cashflow/recommendations?profileId=${PROFILE_ID}`,
         manualReviewResolution: "/api/cashflow/manual-review/resolutions/",
     };
@@ -16,7 +17,10 @@
         categories: [],
         projection: {
             horizonDays: 7,
+            openingBalance: null,
         },
+        preferencesLoaded: false,
+        preferenceSaveTimer: null,
         resolvingMovementIds: new Set(),
     };
 
@@ -37,17 +41,54 @@
         $(`[data-action="provider-sync"]`)?.addEventListener("click", runProviderSync);
         target("manual-review-list")?.addEventListener("click", handleManualReviewClick);
         $(`[data-projection-form]`)?.addEventListener("submit", handleProjectionSubmit);
+        $("#opening-balance")?.addEventListener("input", handleOpeningBalanceChange);
         document.querySelectorAll(`[name="horizonDays"]`).forEach((control) => {
             control.addEventListener("change", handleProjectionPeriodChange);
         });
     });
 
     async function loadInitialData() {
+        await loadCockpitPreferences();
         await renderProfileAndCategories();
         await Promise.allSettled([
             renderMovementEvidence(),
             renderRecommendations(),
         ]);
+    }
+
+    async function loadCockpitPreferences() {
+        const status = target("preferences-status");
+        setState(status, "loading", "Cargando preferencias manuales del cockpit.");
+        try {
+            const preferences = await getJson(API.cockpitPreferences);
+            prefillCockpitPreferences(preferences);
+            state.preferencesLoaded = true;
+            setState(status, "success", "Preferencias manuales cargadas. El saldo no es bancario en vivo.");
+        } catch (error) {
+            state.preferencesLoaded = true;
+            prefillCockpitPreferences({ preferredHorizonDays: 7 });
+            setState(status, "error", safeError(error, "No se pudieron cargar las preferencias manuales."));
+        }
+    }
+
+    function prefillCockpitPreferences(preferences) {
+        const openingBalance = preferences.openingBalance;
+        const preferredHorizonDays = Number(preferences.preferredHorizonDays || 7);
+        state.projection.openingBalance = openingBalance ?? null;
+        state.projection.horizonDays = preferredHorizonDays === 30 ? 30 : 7;
+
+        const balanceInput = $("#opening-balance");
+        if (balanceInput && openingBalance !== null && openingBalance !== undefined) {
+            balanceInput.value = String(openingBalance);
+        }
+        document.querySelectorAll(`[name="horizonDays"]`).forEach((control) => {
+            control.checked = Number(control.value) === state.projection.horizonDays;
+        });
+    }
+
+    function handleOpeningBalanceChange() {
+        state.projection.openingBalance = readOpeningBalance();
+        scheduleCockpitPreferencesSave();
     }
 
     async function renderProfileAndCategories() {
@@ -98,9 +139,38 @@
 
     function handleProjectionPeriodChange(event) {
         state.projection.horizonDays = Number(event.target.value || 7);
+        scheduleCockpitPreferencesSave();
         const balance = readOpeningBalance();
         if (balance !== null) {
             fetchProjection(balance);
+        }
+    }
+
+    function scheduleCockpitPreferencesSave() {
+        if (!state.preferencesLoaded) return;
+        window.clearTimeout(state.preferenceSaveTimer);
+        const status = target("preferences-status");
+        setState(status, "loading", "Guardando preferencias manuales.");
+        state.preferenceSaveTimer = window.setTimeout(persistCockpitPreferences, 500);
+    }
+
+    async function persistCockpitPreferences() {
+        const openingBalance = readOpeningBalance();
+        const status = target("preferences-status");
+        if (openingBalance === null) {
+            setState(status, "error", "Ingresa un saldo inicial manual para guardar preferencias.");
+            return;
+        }
+        try {
+            const saved = await putJson("/api/cashflow/cockpit/preferences", {
+                profileId: PROFILE_ID,
+                openingBalance,
+                preferredHorizonDays: state.projection.horizonDays,
+            });
+            prefillCockpitPreferences(saved);
+            setState(status, "success", "Preferencias guardadas. Saldo manual, no bancario en vivo.");
+        } catch (error) {
+            setState(status, "error", safeError(error, "No se pudieron guardar las preferencias manuales."));
         }
     }
 
@@ -253,6 +323,15 @@
     async function postJson(url, body) {
         const response = await fetch(url, {
             method: "POST",
+            headers: { Accept: "application/json", "Content-Type": "application/json" },
+            body: JSON.stringify(body),
+        });
+        return parseJsonResponse(response);
+    }
+
+    async function putJson(url, body) {
+        const response = await fetch(url, {
+            method: "PUT",
             headers: { Accept: "application/json", "Content-Type": "application/json" },
             body: JSON.stringify(body),
         });

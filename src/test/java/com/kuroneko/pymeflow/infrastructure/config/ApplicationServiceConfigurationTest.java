@@ -4,12 +4,15 @@ import com.kuroneko.pymeflow.application.cashflow.CashflowIngestionService;
 import com.kuroneko.pymeflow.application.cashflow.CashflowMovementHistoryService;
 import com.kuroneko.pymeflow.application.cashflow.CashflowProjectionService;
 import com.kuroneko.pymeflow.application.cashflow.CockpitProjectionService;
+import com.kuroneko.pymeflow.application.cockpit.CockpitPreferencesService;
 import com.kuroneko.pymeflow.application.cashflow.ProviderSyncStatusUseCase;
 import com.kuroneko.pymeflow.application.cashflow.ProviderSyncUseCase;
 import com.kuroneko.pymeflow.application.port.out.BankProviderPort;
+import com.kuroneko.pymeflow.application.port.out.CockpitPreferencesPort;
 import com.kuroneko.pymeflow.application.port.out.ExternalStatementImportPort;
 import com.kuroneko.pymeflow.application.port.out.SyncSessionPort;
 import com.kuroneko.pymeflow.infrastructure.bank.SimulatedBankStatementAdapter;
+import com.kuroneko.pymeflow.infrastructure.persistence.JdbcCockpitPreferencesAdapter;
 import com.kuroneko.pymeflow.infrastructure.persistence.JdbcSyncSessionAdapter;
 import com.kuroneko.pymeflow.infrastructure.provider.FakeBankProviderAdapter;
 import org.junit.jupiter.api.Test;
@@ -64,6 +67,17 @@ class ApplicationServiceConfigurationTest {
         );
 
         assertThat(service).isInstanceOf(CockpitProjectionService.class);
+    }
+
+    @Test
+    void wiresCockpitPreferencesServiceWithJdbcAdapterPort() {
+        var configuration = new ApplicationServiceConfiguration();
+
+        CockpitPreferencesPort port = configuration.cockpitPreferencesPort(mock(JdbcTemplate.class));
+        var service = configuration.cockpitPreferencesService(port);
+
+        assertThat(port).isInstanceOf(JdbcCockpitPreferencesAdapter.class);
+        assertThat(service).isInstanceOf(CockpitPreferencesService.class);
     }
 
     @Test

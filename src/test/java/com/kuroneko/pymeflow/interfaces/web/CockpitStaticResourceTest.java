@@ -144,4 +144,35 @@ class CockpitStaticResourceTest {
                 .andExpect(content().string(containsString("No se pudo cargar la proyecci")))
                 .andExpect(content().string(not(containsString("bank-live"))));
     }
+
+    @Test
+    void servesCockpitWithPreferenceStatusCopyAndManualBalanceSemantics() throws Exception {
+        mockMvc.perform(get("/index.html"))
+                .andExpect(status().isOk())
+                .andExpect(content().string(containsString("data-api-target=\"preferences-status\"")))
+                .andExpect(content().string(containsString("Saldo inicial manual, no bancario")))
+                .andExpect(content().string(containsString("No es saldo bancario en vivo ni saldo bancario real.")))
+                .andExpect(content().string(not(containsString("saldo bancario disponible"))))
+                .andExpect(content().string(not(containsString("saldo bancario actualizado"))));
+    }
+
+    @Test
+    void servesCockpitScriptWithPreferenceLoadPrefillAndAutosaveWiring() throws Exception {
+        mockMvc.perform(get("/app.js"))
+                .andExpect(status().isOk())
+                .andExpect(content().string(containsString("cockpitPreferences")))
+                .andExpect(content().string(containsString("/api/cashflow/cockpit/preferences?profileId=")))
+                .andExpect(content().string(containsString("loadCockpitPreferences")))
+                .andExpect(content().string(containsString("prefillCockpitPreferences")))
+                .andExpect(content().string(containsString("persistCockpitPreferences")))
+                .andExpect(content().string(containsString("preferredHorizonDays")))
+                .andExpect(content().string(containsString("openingBalance")))
+                .andExpect(content().string(containsString("500")))
+                .andExpect(content().string(containsString("method: \"PUT\"")))
+                .andExpect(content().string(containsString("Preferencias guardadas")))
+                .andExpect(content().string(containsString("Guardando preferencias")))
+                .andExpect(content().string(containsString("No se pudieron guardar las preferencias")))
+                .andExpect(content().string(not(containsString("bank-live"))))
+                .andExpect(content().string(not(containsString("live bank"))));
+    }
 }
