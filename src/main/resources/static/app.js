@@ -8,6 +8,12 @@
         manualReview: `/api/cashflow/history/manual-review?profileId=${PROFILE_ID}`,
         projectionReady: `/api/cashflow/history/projection-ready?profileId=${PROFILE_ID}`,
         recommendations: `/api/cashflow/recommendations?profileId=${PROFILE_ID}`,
+        manualReviewResolution: "/api/cashflow/manual-review/resolutions/",
+    };
+
+    const state = {
+        categories: [],
+        resolvingMovementIds: new Set(),
     };
 
     const SAMPLE_ROWS = [
@@ -25,11 +31,12 @@
         loadInitialData();
         $(`[data-action="manual-import"]`)?.addEventListener("click", runManualImport);
         $(`[data-action="provider-sync"]`)?.addEventListener("click", runProviderSync);
+        target("manual-review-list")?.addEventListener("click", handleManualReviewClick);
     });
 
     async function loadInitialData() {
+        await renderProfileAndCategories();
         await Promise.allSettled([
-            renderProfileAndCategories(),
             renderMovementEvidence(),
             renderRecommendations(),
         ]);
@@ -38,9 +45,12 @@
     async function renderProfileAndCategories() {
         try {
             const [profile, categories] = await Promise.all([getJson(API.activeProfile), getJson(API.activeCategories)]);
+            state.categories = categories;
             text("[data-field='profile-label']", `${profile.displayName ?? profile.id}: categorías activas ${categories.length}.`);
         } catch (error) {
+            state.categories = [];
             text("[data-field='profile-label']", safeError(error, "No se pudo cargar el perfil activo."));
+            setState(target("manual-review-list"), "error", "No se pudieron cargar categorías activas. Intenta nuevamente antes de categorizar.");
         }
     }
 
@@ -55,20 +65,21 @@
             const movements = [...projectionReady, ...manualReview];
             updateCashTotals(movements);
             renderLedger(movements);
-            renderReview(manualReview);
+            renderManualReview(manualReview);
         } catch (error) {
             updateCashTotals([]);
             setState(ledger, "error", safeError(error, "No se pudo cargar el historial de caja."));
-            setState(target("review-list"), "error", "No se pudo cargar revisión manual. El resto del cockpit sigue disponible.");
+            setState(target("manual-review-list"), "error", "No se pudo cargar revisión manual. El resto del cockpit sigue disponible.");
         }
     }
 
     async function renderRecommendations() {
-        const container = target("review-list");
+        const container = target("recommendation-list");
+        setState(container, "loading", "Cargando recomendaciones.");
         try {
             const response = await getJson(API.recommendations);
             if (!response.signals?.length) {
-                setState(container, "empty", "Sin datos para mostrar: no hay recomendaciones activas para este perfil.");
+                setState(container, "empty", "Sin recomendaciones activas para este perfil.");
                 return;
             }
             container.innerHTML = `<div class="recommendation-list">${response.signals.map(renderRecommendation).join("")}</div>`;
@@ -94,7 +105,7 @@
                 ["Rechazados", `${response.rejectedCount} filas`],
                 ["Inválidos", `${response.invalid} filas`],
             ]) + rowEvidence(response);
-            await renderMovementEvidence();
+            await refreshCockpitEvidence();
         } catch (error) {
             setState(receipt, "error", safeError(error, "No se pudo completar la importación manual."));
         } finally {
@@ -124,7 +135,7 @@
                 ["Importados", `${status.importedEntries ?? 0}`],
                 ["Durabilidad", status.durability ?? "DURABLE"],
             ]) + safeProviderErrors(status.errors);
-            await renderMovementEvidence();
+            await refreshCockpitEvidence();
         } catch (error) {
             setState(receipt, "error", safeError(error, "No se pudo consultar el estado de sync."));
         } finally {
@@ -171,13 +182,17 @@
         ledger.innerHTML = movements.map(renderMovement).join("");
     }
 
-    function renderReview(manualReview) {
-        const container = target("review-list");
+    function renderManualReview(manualReview) {
+        const container = target("manual-review-list");
         if (!manualReview.length) {
-            setState(container, "empty", "Sin datos para mostrar: no hay movimientos pendientes de revisión manual.");
+            setState(container, "empty", "Sin movimientos pendientes de revisión.");
             return;
         }
-        container.innerHTML = manualReview.map(renderMovement).join("");
+        if (!state.categories.length) {
+            setState(container, "error", "No se pudieron cargar categorías activas. Intenta nuevamente antes de categorizar.");
+            return;
+        }
+        container.innerHTML = `<div class="manual-review-list" role="list">${manualReview.map(renderManualReviewMovement).join("")}</div>`;
     }
 
     function renderMovement(movement) {
@@ -188,8 +203,90 @@
         return `<article class="movement" role="listitem">
             <div><strong>${label}</strong><span>${escapeHtml(meta)}</span></div>
             <span class="pill ${pill}">${direction}</span>
-            <span class="money">${money.format(Number(movement.amount || 0))} ${movement.currency || "CLP"}</span>
+            <span class="money">${formatPositiveMoney(movement.amount)} ${movement.currency || "CLP"}</span>
         </article>`;
+    }
+
+    function renderManualReviewMovement(movement) {
+        const movementId = escapeHtml(movement.movementId);
+        const direction = movement.movementDirection === "DEBIT" ? "DEBIT · movimiento bancario" : "CREDIT · movimiento bancario";
+        const pill = movement.movementDirection === "DEBIT" ? "pill--debit" : "pill--credit";
+        const label = escapeHtml(movement.description || "Movimiento pendiente");
+        const reference = movement.sourceReference ? ` · Ref. ${escapeHtml(movement.sourceReference)}` : "";
+        const disabled = state.resolvingMovementIds.has(movement.movementId) ? " disabled" : "";
+        return `<article class="movement movement--review" role="listitem" data-review-card="${movementId}" aria-busy="${state.resolvingMovementIds.has(movement.movementId)}">
+            <div class="movement-main">
+                <strong>${label}</strong>
+                <span>${escapeHtml(movement.date || "Sin fecha")} · ${escapeHtml(movement.status || "MANUAL_REVIEW")}${reference}</span>
+                <span class="direction-note">Dirección bancaria: ${escapeHtml(movement.movementDirection || "Sin dirección")}. La categoría solo clasifica el flujo.</span>
+            </div>
+            <span class="pill ${pill}">${direction}</span>
+            <span class="money">${formatPositiveMoney(movement.amount)} ${movement.currency || "CLP"}</span>
+            <label class="review-select-label" for="category-${movementId}">Selecciona una categoría</label>
+            <select id="category-${movementId}" data-review-category="${movementId}"${disabled}>
+                <option value="">Seleccione una categoría</option>
+                ${state.categories.map(renderCategoryOption).join("")}
+            </select>
+            <button type="button" data-review-resolve="${movementId}"${disabled}>Categorizar movimiento</button>
+            <p class="review-message" data-review-message="${movementId}" role="status"></p>
+        </article>`;
+    }
+
+    function renderCategoryOption(category) {
+        return `<option value="${escapeHtml(category.key)}">${escapeHtml(category.displayName)} · ${categoryDirectionCopy(category.direction)}</option>`;
+    }
+
+    function categoryDirectionCopy(direction) {
+        if (direction === "INFLOW") return "clasificación INFLOW";
+        if (direction === "OUTFLOW") return "clasificación OUTFLOW";
+        return `clasificación ${direction || "sin dirección"}`;
+    }
+
+    async function handleManualReviewClick(event) {
+        const button = event.target.closest("[data-review-resolve]");
+        if (!button) return;
+        const movementId = button.dataset.reviewResolve;
+        const card = button.closest("[data-review-card]");
+        const select = card?.querySelector("[data-review-category]");
+        const message = card?.querySelector("[data-review-message]");
+        if (!select?.value) {
+            setInlineMessage(message, "error", "Seleccione una categoría antes de categorizar.");
+            return;
+        }
+        await resolveManualReviewMovement(movementId, select.value, card, message);
+    }
+
+    async function resolveManualReviewMovement(movementId, chosenCategoryKey, card, message) {
+        setReviewCardBusy(card, true);
+        state.resolvingMovementIds.add(movementId);
+        setInlineMessage(message, "loading", "Categorizando movimiento.");
+        try {
+            const movement = collectMovementContext(card);
+            await postJson(`${API.manualReviewResolution}${movementId}`, {
+                profileId: PROFILE_ID,
+                chosenCategoryKey,
+                description: movement.description,
+                sourceReference: movement.sourceReference,
+            });
+            setInlineMessage(message, "success", "Movimiento categorizado correctamente.");
+            await refreshCockpitEvidence();
+        } catch (error) {
+            setInlineMessage(message, "error", safeError(error, "No se pudo categorizar el movimiento. Intenta nuevamente."));
+        } finally {
+            state.resolvingMovementIds.delete(movementId);
+            setReviewCardBusy(card, false);
+        }
+    }
+
+    function collectMovementContext(card) {
+        const title = card?.querySelector(".movement-main strong")?.textContent || null;
+        const meta = card?.querySelector(".movement-main span")?.textContent || "";
+        const reference = meta.match(/Ref\. ([^·]+)/)?.[1]?.trim() || null;
+        return { description: title, sourceReference: reference };
+    }
+
+    async function refreshCockpitEvidence() {
+        await Promise.allSettled([renderMovementEvidence(), renderRecommendations()]);
     }
 
     function renderRecommendation(signal) {
@@ -231,6 +328,24 @@
         if (!button) return;
         button.disabled = busy;
         button.setAttribute("aria-busy", String(busy));
+    }
+
+    function setReviewCardBusy(card, busy) {
+        if (!card) return;
+        card.setAttribute("aria-busy", String(busy));
+        card.querySelectorAll("select, button").forEach((control) => {
+            control.disabled = busy;
+        });
+    }
+
+    function setInlineMessage(element, type, message) {
+        if (!element) return;
+        element.className = `review-message ${type === "error" ? "error-state" : type === "success" ? "success-state" : ""}`.trim();
+        element.textContent = message;
+    }
+
+    function formatPositiveMoney(amount) {
+        return money.format(Math.abs(Number(amount || 0)));
     }
 
     function text(selector, value) {

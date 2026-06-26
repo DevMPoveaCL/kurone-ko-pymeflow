@@ -203,10 +203,8 @@ button:disabled { cursor: wait; opacity: 0.64; }
 
 .actions-panel,
 .review-panel {
-    display: flex;
-    justify-content: space-between;
+    display: grid;
     gap: 1rem;
-    align-items: center;
     border-radius: var(--radius-card);
     padding: 1.25rem;
 }
@@ -223,6 +221,9 @@ button:disabled { cursor: wait; opacity: 0.64; }
 .receipt-rail,
 .ledger-panel,
 .review-panel { border-radius: var(--radius-card); padding: 1.25rem; }
+.review-grid { display: grid; grid-template-columns: minmax(320px, 1.25fr) minmax(260px, 0.75fr); gap: 1rem; align-items: start; }
+.review-column { display: grid; gap: 0.75rem; }
+.review-help { margin: 0; color: var(--bank-ink-soft); line-height: 1.55; }
 .receipt-rail { display: grid; gap: 1rem; }
 .section-heading p { color: var(--bank-ink-soft); line-height: 1.55; }
 
@@ -287,6 +288,17 @@ dd { margin: 0; font-weight: 700; }
 .pill { border-radius: var(--radius-control); padding: 0.35rem 0.6rem; font-family: "Trebuchet MS", Verdana, sans-serif; font-weight: 800; }
 .pill--credit { background: rgba(25, 112, 72, 0.13); color: var(--clp-green); }
 .pill--debit { background: rgba(168, 93, 28, 0.14); color: var(--copper-alert); }
+.manual-review-list { display: grid; gap: 0.85rem; }
+.movement--review { grid-template-columns: minmax(220px, 1fr) auto auto; }
+.movement--review .review-select-label,
+.movement--review select,
+.movement--review button,
+.movement--review .review-message { grid-column: 1 / -1; }
+.direction-note { color: var(--bank-ink); font-weight: 700; }
+.review-select-label { color: var(--bank-ink-soft); font-family: "Trebuchet MS", Verdana, sans-serif; font-size: 0.8rem; font-weight: 800; letter-spacing: 0.08em; text-transform: uppercase; }
+select { width: 100%; border: 1px solid var(--line-strong); border-radius: 14px; background: rgba(255, 250, 240, 0.78); color: var(--bank-ink); padding: 0.8rem 0.9rem; font: inherit; }
+select:disabled { cursor: wait; opacity: 0.64; }
+.review-message { min-height: 1.2rem; margin: 0; color: var(--bank-ink-soft); }
 
 .empty-state {
     border: 1px dashed var(--line-strong);
