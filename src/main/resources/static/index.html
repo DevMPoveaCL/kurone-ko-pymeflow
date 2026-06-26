@@ -100,11 +100,24 @@
         <section id="revision" class="review-panel" aria-label="Revisión manual y estados seguros">
             <div>
                 <p class="eyebrow">Revisión</p>
-                <h2>Movimientos que requieren decisión</h2>
-                <p>Si una API devuelve vacío o error seguro, esta zona mantendrá el resto del cockpit utilizable.</p>
+                <h2>Movimientos pendientes de revisión</h2>
+                <p>Selecciona una categoría activa para clasificar cada movimiento sin mezclar la dirección bancaria DEBIT/CREDIT con la clasificación INFLOW/OUTFLOW.</p>
             </div>
-            <div class="empty-state" role="status" data-api-target="review-list" aria-live="polite">
-                Cargando recomendaciones, historial projection-ready y revisión manual.
+            <div class="review-grid">
+                <section class="review-column" aria-label="Movimientos pendientes de revisión manual">
+                    <h3>Movimientos pendientes de revisión</h3>
+                    <p class="review-help">Selecciona una categoría y usa “Categorizar movimiento” para dejarlo listo para proyección. Sin movimientos pendientes de revisión se mostrará un estado seguro.</p>
+                    <div class="empty-state" role="status" data-api-target="manual-review-list" aria-live="polite">
+                        Cargando movimientos pendientes de revisión.
+                    </div>
+                </section>
+                <section class="review-column" aria-label="Recomendaciones de caja">
+                    <h3>Recomendaciones</h3>
+                    <p class="review-help">Evidencia separada: las recomendaciones no reemplazan la cola de revisión manual.</p>
+                    <div class="empty-state" role="status" data-api-target="recommendation-list" aria-live="polite">
+                        Cargando recomendaciones.
+                    </div>
+                </section>
             </div>
         </section>
     </main>

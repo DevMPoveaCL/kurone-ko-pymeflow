@@ -62,7 +62,8 @@ class CockpitStaticResourceTest {
                 .andExpect(content().string(containsString("data-api-target=\"cash-summary\"")))
                 .andExpect(content().string(containsString("data-api-target=\"sync-receipt\"")))
                 .andExpect(content().string(containsString("data-api-target=\"ledger-list\"")))
-                .andExpect(content().string(containsString("data-api-target=\"review-list\"")));
+                .andExpect(content().string(containsString("data-api-target=\"recommendation-list\"")))
+                .andExpect(content().string(containsString("data-api-target=\"manual-review-list\"")));
 
         mockMvc.perform(get("/app.js"))
                 .andExpect(status().isOk())
@@ -78,5 +79,36 @@ class CockpitStaticResourceTest {
                 .andExpect(content().string(not(containsString("credentialRef"))))
                 .andExpect(content().string(not(containsString("cursor"))))
                 .andExpect(content().string(not(containsString("token"))));
+    }
+
+    @Test
+    void servesCockpitWithManualReviewCopyAndSeparateRecommendationRegion() throws Exception {
+        mockMvc.perform(get("/index.html"))
+                .andExpect(status().isOk())
+                .andExpect(content().string(containsString("Movimientos pendientes")))
+                .andExpect(content().string(containsString("Selecciona una categor")))
+                .andExpect(content().string(containsString("Categorizar movimiento")))
+                .andExpect(content().string(containsString("Sin movimientos pendientes")))
+                .andExpect(content().string(containsString("aria-label=\"Recomendaciones de caja\"")))
+                .andExpect(content().string(containsString("aria-label=\"Movimientos pendientes")));
+    }
+
+    @Test
+    void servesCockpitScriptWithPersistedReviewResolutionWiringAndDirectionInvariants() throws Exception {
+        mockMvc.perform(get("/app.js"))
+                .andExpect(status().isOk())
+                .andExpect(content().string(containsString("state.categories")))
+                .andExpect(content().string(containsString("state.resolvingMovementIds")))
+                .andExpect(content().string(containsString("/api/cashflow/manual-review/resolutions/")))
+                .andExpect(content().string(containsString("chosenCategoryKey")))
+                .andExpect(content().string(containsString("Seleccione una categor")))
+                .andExpect(content().string(containsString("Categorizar movimiento")))
+                .andExpect(content().string(containsString("Math.abs")))
+                .andExpect(content().string(containsString("DEBIT")))
+                .andExpect(content().string(containsString("CREDIT")))
+                .andExpect(content().string(containsString("INFLOW")))
+                .andExpect(content().string(containsString("OUTFLOW")))
+                .andExpect(content().string(not(containsString("INFLOW · abono"))))
+                .andExpect(content().string(not(containsString("OUTFLOW · cargo"))));
     }
 }
