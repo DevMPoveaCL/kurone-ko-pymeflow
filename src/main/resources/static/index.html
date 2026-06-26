@@ -25,6 +25,7 @@
 
     <nav class="quick-nav" aria-label="Secciones del cockpit">
         <a href="#caja">Caja</a>
+        <a href="#proyeccion">Proyección</a>
         <a href="#comprobantes">Comprobantes</a>
         <a href="#cartola">Cartola</a>
         <a href="#revision">Revisión</a>
@@ -60,6 +61,30 @@
             <div class="button-row" aria-label="Acciones de caja">
                 <button type="button" data-action="manual-import">Revisar abonos y cargos con muestra manual</button>
                 <button type="button" class="button-secondary" data-action="provider-sync">Ejecutar sync fixture</button>
+            </div>
+        </section>
+
+        <section id="proyeccion" class="projection-panel" aria-label="Proyección de caja por período" data-api-target="projection-panel">
+            <div class="projection-copy">
+                <p class="eyebrow">Proyección</p>
+                <h2>Cómo se ve la caja esta semana o este mes</h2>
+                <p>Usa movimientos categorizados y listos para proyección. El saldo inicial es ingresado por el usuario: no viene de una conexión bancaria en vivo.</p>
+            </div>
+            <form class="projection-controls" data-projection-form>
+                <label for="opening-balance">Saldo inicial manual, no bancario</label>
+                <input id="opening-balance" name="openingBalance" type="number" min="0" step="1000" inputmode="numeric" placeholder="Ej: 350000" aria-describedby="opening-balance-help">
+                <p id="opening-balance-help">Monto ingresado por el usuario para simular la caja disponible. No es saldo bancario en vivo ni saldo bancario real.</p>
+
+                <fieldset>
+                    <legend>Período de proyección</legend>
+                    <label><input type="radio" name="horizonDays" value="7" checked> 7 días</label>
+                    <label><input type="radio" name="horizonDays" value="30"> 30 días</label>
+                </fieldset>
+
+                <button type="submit">Calcular proyección</button>
+            </form>
+            <div class="empty-state" role="status" data-api-target="projection-results" aria-live="polite">
+                Categoriza movimientos para proyectar la caja. Luego ingresa un saldo inicial manual y elige 7 o 30 días.
             </div>
         </section>
 

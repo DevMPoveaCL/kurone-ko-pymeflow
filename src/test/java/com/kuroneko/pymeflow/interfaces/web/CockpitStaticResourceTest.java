@@ -111,4 +111,37 @@ class CockpitStaticResourceTest {
                 .andExpect(content().string(not(containsString("INFLOW · abono"))))
                 .andExpect(content().string(not(containsString("OUTFLOW · cargo"))));
     }
+
+    @Test
+    void servesCockpitWithPeriodProjectionControlsAndManualOpeningBalanceCopy() throws Exception {
+        mockMvc.perform(get("/index.html"))
+                .andExpect(status().isOk())
+                .andExpect(content().string(containsString("aria-label=\"Proyecci")))
+                .andExpect(content().string(containsString("Saldo inicial manual, no bancario")))
+                .andExpect(content().string(containsString("ingresado por el usuario")))
+                .andExpect(content().string(containsString("value=\"7\"")))
+                .andExpect(content().string(containsString("value=\"30\"")))
+                .andExpect(content().string(containsString("data-api-target=\"projection-results\"")))
+                .andExpect(content().string(containsString("Categoriza movimientos para proyectar la caja")));
+    }
+
+    @Test
+    void servesCockpitScriptWithProjectionEndpointRenderingAndSafeStates() throws Exception {
+        mockMvc.perform(get("/app.js"))
+                .andExpect(status().isOk())
+                .andExpect(content().string(containsString("/api/cashflow/cockpit/projection")))
+                .andExpect(content().string(containsString("horizonDays")))
+                .andExpect(content().string(containsString("openingBalance")))
+                .andExpect(content().string(containsString("closingProjectedBalance")))
+                .andExpect(content().string(containsString("dailyBalances")))
+                .andExpect(content().string(containsString("appliedObligations")))
+                .andExpect(content().string(containsString("alerts")))
+                .andExpect(content().string(containsString("abonos")))
+                .andExpect(content().string(containsString("cargos")))
+                .andExpect(content().string(containsString("obligaciones")))
+                .andExpect(content().string(containsString("Ingresa un saldo inicial manual para proyectar caja.")))
+                .andExpect(content().string(containsString("Categoriza movimientos primero para proyectar caja.")))
+                .andExpect(content().string(containsString("No se pudo cargar la proyecci")))
+                .andExpect(content().string(not(containsString("bank-live"))));
+    }
 }

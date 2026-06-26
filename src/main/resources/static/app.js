@@ -7,12 +7,16 @@
         manualImport: "/api/cashflow/imports/manual",
         manualReview: `/api/cashflow/history/manual-review?profileId=${PROFILE_ID}`,
         projectionReady: `/api/cashflow/history/projection-ready?profileId=${PROFILE_ID}`,
+        cockpitProjection: "/api/cashflow/cockpit/projection",
         recommendations: `/api/cashflow/recommendations?profileId=${PROFILE_ID}`,
         manualReviewResolution: "/api/cashflow/manual-review/resolutions/",
     };
 
     const state = {
         categories: [],
+        projection: {
+            horizonDays: 7,
+        },
         resolvingMovementIds: new Set(),
     };
 
@@ -32,6 +36,10 @@
         $(`[data-action="manual-import"]`)?.addEventListener("click", runManualImport);
         $(`[data-action="provider-sync"]`)?.addEventListener("click", runProviderSync);
         target("manual-review-list")?.addEventListener("click", handleManualReviewClick);
+        $(`[data-projection-form]`)?.addEventListener("submit", handleProjectionSubmit);
+        document.querySelectorAll(`[name="horizonDays"]`).forEach((control) => {
+            control.addEventListener("change", handleProjectionPeriodChange);
+        });
     });
 
     async function loadInitialData() {
@@ -86,6 +94,100 @@
         } catch (error) {
             setState(container, "error", safeError(error, "No se pudo cargar recomendaciones."));
         }
+    }
+
+    function handleProjectionPeriodChange(event) {
+        state.projection.horizonDays = Number(event.target.value || 7);
+        const balance = readOpeningBalance();
+        if (balance !== null) {
+            fetchProjection(balance);
+        }
+    }
+
+    function handleProjectionSubmit(event) {
+        event.preventDefault();
+        const balance = readOpeningBalance();
+        if (balance === null) {
+            setState(target("projection-results"), "error", "Ingresa un saldo inicial manual para proyectar caja.");
+            $("#opening-balance")?.focus();
+            return;
+        }
+        fetchProjection(balance);
+    }
+
+    async function fetchProjection(openingBalance) {
+        const results = target("projection-results");
+        setState(results, "loading", "Calculando proyección de caja con saldo inicial manual.");
+        try {
+            const params = new URLSearchParams({
+                profileId: PROFILE_ID,
+                startDate: todayIsoDate(),
+                horizonDays: String(state.projection.horizonDays),
+                openingBalance: String(openingBalance),
+            });
+            const projection = await getJson(`${API.cockpitProjection}?${params.toString()}`);
+            renderProjection(projection);
+        } catch (error) {
+            setState(results, "error", safeError(error, "No se pudo cargar la proyección de caja."));
+        }
+    }
+
+    function renderProjection(projection) {
+        const results = target("projection-results");
+        const dailyBalances = projection.dailyBalances || [];
+        if (!dailyBalances.length) {
+            setState(results, "empty", "Categoriza movimientos primero para proyectar caja.");
+            return;
+        }
+        const totals = summarizeProjection(dailyBalances);
+        results.innerHTML = `<div class="projection-summary" role="region" aria-label="Resultado de proyección">
+            <article class="projection-closing">
+                <span>Cierre proyectado</span>
+                <strong>${money.format(Number(projection.closingProjectedBalance || 0))}</strong>
+                <p>Calculado con saldo inicial manual ingresado por el usuario, no bancario en vivo.</p>
+            </article>
+            <dl class="projection-totals">
+                <div><dt>abonos</dt><dd>${money.format(totals.inflows)}</dd></div>
+                <div><dt>cargos</dt><dd>${money.format(totals.outflows)}</dd></div>
+                <div><dt>obligaciones</dt><dd>${money.format(totals.obligations)}</dd></div>
+            </dl>
+            ${renderProjectionAlerts(projection.alerts || [])}
+            ${renderAppliedObligations(projection.appliedObligations || [])}
+            <div class="projection-days" role="list" aria-label="Saldos diarios proyectados">
+                ${dailyBalances.map(renderDailyBalance).join("")}
+            </div>
+        </div>`;
+    }
+
+    function summarizeProjection(dailyBalances) {
+        return dailyBalances.reduce((totals, day) => ({
+            inflows: totals.inflows + Number(day.inflows || 0),
+            outflows: totals.outflows + Number(day.outflows || 0),
+            obligations: totals.obligations + Number(day.obligations || 0),
+        }), { inflows: 0, outflows: 0, obligations: 0 });
+    }
+
+    function renderDailyBalance(day) {
+        return `<article class="projection-day" role="listitem">
+            <div><strong>${escapeHtml(day.date || "Sin fecha")}</strong><span>Saldo diario proyectado</span></div>
+            <span class="money">${money.format(Number(day.balance || 0))}</span>
+            <span class="pill pill--credit">abonos ${money.format(Number(day.inflows || 0))}</span>
+            <span class="pill pill--debit">cargos ${money.format(Number(day.outflows || 0) + Number(day.obligations || 0))}</span>
+        </article>`;
+    }
+
+    function renderProjectionAlerts(alerts) {
+        if (!alerts.length) return `<p class="success-state">Sin alertas de caja para este período.</p>`;
+        return `<div class="projection-alerts" aria-label="Alertas de proyección">
+            ${alerts.map((alert) => `<span class="alert-chip">${escapeHtml(alert.condition || alert.ruleKey || "Alerta de caja")} · ${escapeHtml(alert.date || "sin fecha")}</span>`).join("")}
+        </div>`;
+    }
+
+    function renderAppliedObligations(obligations) {
+        if (!obligations.length) return `<p class="empty-state">Sin obligaciones aplicadas en el período.</p>`;
+        return `<div class="obligation-list" aria-label="Obligaciones aplicadas">
+            ${obligations.map((obligation) => `<span class="obligation-chip">${escapeHtml(obligation.displayName || obligation.obligationKey || "Obligación")} · ${money.format(Number(obligation.amount || 0))}</span>`).join("")}
+        </div>`;
     }
 
     async function runManualImport() {
@@ -286,7 +388,10 @@
     }
 
     async function refreshCockpitEvidence() {
-        await Promise.allSettled([renderMovementEvidence(), renderRecommendations()]);
+        const balance = readOpeningBalance();
+        const refreshes = [renderMovementEvidence(), renderRecommendations()];
+        if (balance !== null) refreshes.push(fetchProjection(balance));
+        await Promise.allSettled(refreshes);
     }
 
     function renderRecommendation(signal) {
@@ -346,6 +451,17 @@
 
     function formatPositiveMoney(amount) {
         return money.format(Math.abs(Number(amount || 0)));
+    }
+
+    function readOpeningBalance() {
+        const value = $("#opening-balance")?.value;
+        if (!value) return null;
+        const amount = Number(value);
+        return Number.isFinite(amount) && amount >= 0 ? amount : null;
+    }
+
+    function todayIsoDate() {
+        return new Date().toISOString().slice(0, 10);
     }
 
     function text(selector, value) {
