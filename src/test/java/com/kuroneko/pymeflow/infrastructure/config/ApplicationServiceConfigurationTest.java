@@ -1,6 +1,9 @@
 package com.kuroneko.pymeflow.infrastructure.config;
 
 import com.kuroneko.pymeflow.application.cashflow.CashflowIngestionService;
+import com.kuroneko.pymeflow.application.cashflow.CashflowMovementHistoryService;
+import com.kuroneko.pymeflow.application.cashflow.CashflowProjectionService;
+import com.kuroneko.pymeflow.application.cashflow.CockpitProjectionService;
 import com.kuroneko.pymeflow.application.cashflow.ProviderSyncStatusUseCase;
 import com.kuroneko.pymeflow.application.cashflow.ProviderSyncUseCase;
 import com.kuroneko.pymeflow.application.port.out.BankProviderPort;
@@ -49,6 +52,18 @@ class ApplicationServiceConfigurationTest {
         ProviderSyncStatusUseCase statusUseCase = configuration.providerSyncStatusUseCase(mock(SyncSessionPort.class));
 
         assertThat(statusUseCase).isInstanceOf(ProviderSyncStatusUseCase.class);
+    }
+
+    @Test
+    void wiresCockpitProjectionServiceWithHistoryAndProjectionServices() {
+        var configuration = new ApplicationServiceConfiguration();
+
+        var service = configuration.cockpitProjectionService(
+                mock(CashflowMovementHistoryService.class),
+                mock(CashflowProjectionService.class)
+        );
+
+        assertThat(service).isInstanceOf(CockpitProjectionService.class);
     }
 
     @Test
