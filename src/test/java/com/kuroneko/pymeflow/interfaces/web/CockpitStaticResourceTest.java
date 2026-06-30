@@ -175,4 +175,36 @@ class CockpitStaticResourceTest {
                 .andExpect(content().string(not(containsString("bank-live"))))
                 .andExpect(content().string(not(containsString("live bank"))));
     }
+
+    @Test
+    void servesCockpitWithDemoResetControlAndDemoOnlyCopy() throws Exception {
+        mockMvc.perform(get("/index.html"))
+                .andExpect(status().isOk())
+                .andExpect(content().string(containsString("id=\"demo-reset-btn\"")))
+                .andExpect(content().string(containsString("Reiniciar demo")))
+                .andExpect(content().string(containsString("data-api-target=\"demo-reset-status\"")))
+                .andExpect(content().string(containsString("solo reinicia datos fixture/demo")))
+                .andExpect(content().string(not(containsString("conectividad bancaria real habilitada"))))
+                .andExpect(content().string(not(containsString("proveedor real conectado"))));
+    }
+
+    @Test
+    void servesCockpitScriptWithDemoResetEndpointSafeStatesAndFullEvidenceRefresh() throws Exception {
+        mockMvc.perform(get("/app.js"))
+                .andExpect(status().isOk())
+                .andExpect(content().string(containsString("demoReset: `/api/cockpit/demo/reset-and-seed?profileId=${PROFILE_ID}`")))
+                .andExpect(content().string(containsString("#demo-reset-btn")))
+                .andExpect(content().string(containsString("runDemoReset")))
+                .andExpect(content().string(containsString("Reiniciando datos fixture/demo")))
+                .andExpect(content().string(containsString("Demo reiniciada")))
+                .andExpect(content().string(containsString("No se pudo reiniciar la demo. Los datos visibles se mantienen.")))
+                .andExpect(content().string(containsString("loadCockpitPreferences()")))
+                .andExpect(content().string(containsString("renderProfileAndCategories()")))
+                .andExpect(content().string(containsString("renderMovementEvidence()")))
+                .andExpect(content().string(containsString("renderRecommendations()")))
+                .andExpect(content().string(containsString("fetchProjection(balance)")))
+                .andExpect(content().string(not(containsString("safeError(error, \"No se pudo reiniciar la demo"))))
+                .andExpect(content().string(not(containsString("stack"))))
+                .andExpect(content().string(not(containsString("trace"))));
+    }
 }

@@ -4,6 +4,7 @@ import com.kuroneko.pymeflow.application.port.out.SyncSessionPort;
 import com.kuroneko.pymeflow.domain.vertical.ProfileId;
 import org.springframework.dao.DuplicateKeyException;
 import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.jdbc.core.ConnectionCallback;
 
 import java.sql.ResultSet;
 import java.sql.SQLException;
@@ -35,6 +36,32 @@ public final class JdbcSyncSessionAdapter implements SyncSessionPort {
     @Override
     public String syncId(ProfileId profileId, String providerType) {
         var key = sessionKey(profileId, providerType);
+        insertSessionIfMissing(key);
+        return jdbcTemplate.queryForObject("""
+                select sync_id
+                from provider_sync_sessions
+                where profile_id = ? and provider_type = ?
+                """, String.class, key.profileId().value(), key.providerType());
+    }
+
+    private void insertSessionIfMissing(SessionKey key) {
+        var now = Timestamp.from(Instant.now());
+        if (isPostgreSQL()) {
+            jdbcTemplate.update("""
+                            insert into provider_sync_sessions
+                            (sync_id, profile_id, provider_type, status, created_at, updated_at)
+                            values (?, ?, ?, ?, ?, ?)
+                            on conflict (profile_id, provider_type) do nothing
+                            """,
+                    newSyncId(),
+                    key.profileId().value(),
+                    key.providerType(),
+                    SyncStatus.PARTIAL.name(),
+                    now,
+                    now
+            );
+            return;
+        }
         try {
             jdbcTemplate.update("""
                             insert into provider_sync_sessions
@@ -45,17 +72,17 @@ public final class JdbcSyncSessionAdapter implements SyncSessionPort {
                     key.profileId().value(),
                     key.providerType(),
                     SyncStatus.PARTIAL.name(),
-                    Timestamp.from(Instant.now()),
-                    Timestamp.from(Instant.now())
+                    now,
+                    now
             );
         } catch (DuplicateKeyException ignored) {
-            // Existing profile/provider session owns the cursor state.
+            // Non-PostgreSQL tests can keep the historical idempotent insert fallback.
         }
-        return jdbcTemplate.queryForObject("""
-                select sync_id
-                from provider_sync_sessions
-                where profile_id = ? and provider_type = ?
-                """, String.class, key.profileId().value(), key.providerType());
+    }
+
+    private boolean isPostgreSQL() {
+        return Boolean.TRUE.equals(jdbcTemplate.execute((ConnectionCallback<Boolean>) connection ->
+                connection.getMetaData().getDatabaseProductName().equalsIgnoreCase("PostgreSQL")));
     }
 
     @Override

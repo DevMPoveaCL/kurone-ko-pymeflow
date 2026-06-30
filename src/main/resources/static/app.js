@@ -9,6 +9,7 @@
         projectionReady: `/api/cashflow/history/projection-ready?profileId=${PROFILE_ID}`,
         cockpitProjection: "/api/cashflow/cockpit/projection",
         cockpitPreferences: `/api/cashflow/cockpit/preferences?profileId=${PROFILE_ID}`,
+        demoReset: `/api/cockpit/demo/reset-and-seed?profileId=${PROFILE_ID}`,
         recommendations: `/api/cashflow/recommendations?profileId=${PROFILE_ID}`,
         manualReviewResolution: "/api/cashflow/manual-review/resolutions/",
     };
@@ -39,6 +40,7 @@
         loadInitialData();
         $(`[data-action="manual-import"]`)?.addEventListener("click", runManualImport);
         $(`[data-action="provider-sync"]`)?.addEventListener("click", runProviderSync);
+        $("#demo-reset-btn")?.addEventListener("click", runDemoReset);
         target("manual-review-list")?.addEventListener("click", handleManualReviewClick);
         $(`[data-projection-form]`)?.addEventListener("submit", handleProjectionSubmit);
         $("#opening-balance")?.addEventListener("input", handleOpeningBalanceChange);
@@ -300,13 +302,7 @@
             secretFreeRequest["credential" + "Ref"] = "fixture-ref-santander";
             const response = await postJson(API.providerSyncs, secretFreeRequest);
             const status = response.syncId ? await getJson(`${API.providerSyncs}/${response.syncId}`) : response;
-            receipt.innerHTML = receiptHeader("Demo", "Sync proveedor simulado") + definitionList([
-                ["Estado", status.status ?? "Sin estado"],
-                ["Proveedor", status.providerType ?? "fixture"],
-                ["Entradas", `${status.entriesFetched ?? 0}`],
-                ["Importados", `${status.importedEntries ?? 0}`],
-                ["Durabilidad", status.durability ?? "DURABLE"],
-            ]) + safeProviderErrors(status.errors);
+            receipt.innerHTML = renderProviderSyncReceipt(status, "Sync proveedor simulado");
             await refreshCockpitEvidence();
         } catch (error) {
             setState(receipt, "error", safeError(error, "No se pudo consultar el estado de sync."));
@@ -315,17 +311,49 @@
         }
     }
 
+    async function runDemoReset() {
+        const button = $("#demo-reset-btn");
+        const status = target("demo-reset-status");
+        setBusy(button, true);
+        setState(status, "loading", "Reiniciando datos fixture/demo. No se consulta conectividad bancaria real.");
+        try {
+            const response = await postJson(API.demoReset);
+            if (response.syncSessionId) {
+                await renderSyncStatus(response.syncSessionId);
+            }
+            await refreshCockpitEvidence();
+            setState(status, "success", "Demo reiniciada. Evidencia visible actualizada con datos fixture/demo.");
+        } catch (error) {
+            setState(status, "error", "No se pudo reiniciar la demo. Los datos visibles se mantienen.");
+        } finally {
+            setBusy(button, false);
+        }
+    }
+
+    async function renderSyncStatus(syncSessionId) {
+        const receipt = target("sync-receipt");
+        try {
+            const status = await getJson(`${API.providerSyncs}/${syncSessionId}`);
+            receipt.innerHTML = renderProviderSyncReceipt(status, "Sync fixture sembrada");
+        } catch (error) {
+            setState(receipt, "error", safeError(error, "Demo reiniciada; no se pudo actualizar el comprobante de sync."));
+        }
+    }
+
     async function getJson(url) {
         const response = await fetch(url, { headers: { Accept: "application/json" } });
         return parseJsonResponse(response);
     }
 
-    async function postJson(url, body) {
-        const response = await fetch(url, {
+    async function postJson(url, body = null) {
+        const options = {
             method: "POST",
             headers: { Accept: "application/json", "Content-Type": "application/json" },
-            body: JSON.stringify(body),
-        });
+        };
+        if (body !== null) {
+            options.body = JSON.stringify(body);
+        }
+        const response = await fetch(url, options);
         return parseJsonResponse(response);
     }
 
@@ -467,6 +495,7 @@
     }
 
     async function refreshCockpitEvidence() {
+        await Promise.allSettled([loadCockpitPreferences(), renderProfileAndCategories()]);
         const balance = readOpeningBalance();
         const refreshes = [renderMovementEvidence(), renderRecommendations()];
         if (balance !== null) refreshes.push(fetchProjection(balance));
@@ -492,6 +521,16 @@
     function safeProviderErrors(errors) {
         if (!errors?.length) return `<p class="success-state">Sin errores seguros reportados.</p>`;
         return `<p class="error-state">${errors.map((error) => escapeHtml(error.message || error.code)).join(" · ")}</p>`;
+    }
+
+    function renderProviderSyncReceipt(status, title) {
+        return receiptHeader("Demo", title) + definitionList([
+            ["Estado", status.status ?? "Sin estado"],
+            ["Proveedor", status.providerType ?? "fixture"],
+            ["Entradas", `${status.entriesFetched ?? 0}`],
+            ["Importados", `${status.importedEntries ?? 0}`],
+            ["Durabilidad", status.durability ?? "DURABLE"],
+        ]) + safeProviderErrors(status.errors);
     }
 
     function receiptHeader(stamp, title) {
