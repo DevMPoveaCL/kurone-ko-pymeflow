@@ -9,6 +9,7 @@ import com.kuroneko.pymeflow.application.cashflow.ProviderSyncStatusUseCase;
 import com.kuroneko.pymeflow.application.cashflow.ProviderSyncUseCase;
 import com.kuroneko.pymeflow.application.cashflow.SensitiveDataPolicy;
 import com.kuroneko.pymeflow.application.cockpit.CockpitPreferencesService;
+import com.kuroneko.pymeflow.application.cockpit.CockpitDemoResetService;
 import com.kuroneko.pymeflow.application.export.AccountantExportService;
 import com.kuroneko.pymeflow.application.port.out.AccountantExportPort;
 import com.kuroneko.pymeflow.application.port.out.BankProviderPort;
@@ -16,6 +17,7 @@ import com.kuroneko.pymeflow.application.port.out.CashflowCategorizationPort;
 import com.kuroneko.pymeflow.application.port.out.CashflowMovementHistoryPort;
 import com.kuroneko.pymeflow.application.port.out.CockpitPreferencesPort;
 import com.kuroneko.pymeflow.application.port.out.ExternalStatementImportPort;
+import com.kuroneko.pymeflow.application.port.out.DemoDataPort;
 import com.kuroneko.pymeflow.application.port.out.ProfileRegistryPort;
 import com.kuroneko.pymeflow.application.port.out.ProviderSyncObservationPort;
 import com.kuroneko.pymeflow.application.port.out.SyncSessionPort;
@@ -125,6 +127,21 @@ public class ApplicationServiceConfiguration {
     @Bean
     CockpitPreferencesService cockpitPreferencesService(CockpitPreferencesPort cockpitPreferencesPort) {
         return new CockpitPreferencesService(cockpitPreferencesPort);
+    }
+
+    @Bean
+    CockpitDemoResetService cockpitDemoResetService(
+            DemoDataPort demoDataPort,
+            CashflowMovementHistoryPort cashflowMovementHistoryPort,
+            SyncSessionPort syncSessionPort,
+            CockpitPreferencesPort cockpitPreferencesPort
+    ) {
+        return new CockpitDemoResetService(
+                demoDataPort,
+                cashflowMovementHistoryPort,
+                syncSessionPort,
+                cockpitPreferencesPort
+        );
     }
 
     @Bean

@@ -4,11 +4,14 @@ import com.kuroneko.pymeflow.application.cashflow.CashflowIngestionService;
 import com.kuroneko.pymeflow.application.cashflow.CashflowMovementHistoryService;
 import com.kuroneko.pymeflow.application.cashflow.CashflowProjectionService;
 import com.kuroneko.pymeflow.application.cashflow.CockpitProjectionService;
+import com.kuroneko.pymeflow.application.cockpit.CockpitDemoResetService;
 import com.kuroneko.pymeflow.application.cockpit.CockpitPreferencesService;
 import com.kuroneko.pymeflow.application.cashflow.ProviderSyncStatusUseCase;
 import com.kuroneko.pymeflow.application.cashflow.ProviderSyncUseCase;
 import com.kuroneko.pymeflow.application.port.out.BankProviderPort;
+import com.kuroneko.pymeflow.application.port.out.CashflowMovementHistoryPort;
 import com.kuroneko.pymeflow.application.port.out.CockpitPreferencesPort;
+import com.kuroneko.pymeflow.application.port.out.DemoDataPort;
 import com.kuroneko.pymeflow.application.port.out.ExternalStatementImportPort;
 import com.kuroneko.pymeflow.application.port.out.SyncSessionPort;
 import com.kuroneko.pymeflow.infrastructure.bank.SimulatedBankStatementAdapter;
@@ -78,6 +81,20 @@ class ApplicationServiceConfigurationTest {
 
         assertThat(port).isInstanceOf(JdbcCockpitPreferencesAdapter.class);
         assertThat(service).isInstanceOf(CockpitPreferencesService.class);
+    }
+
+    @Test
+    void wiresCockpitDemoResetServiceWithDemoDataPorts() {
+        var configuration = new ApplicationServiceConfiguration();
+
+        var service = configuration.cockpitDemoResetService(
+                mock(DemoDataPort.class),
+                mock(CashflowMovementHistoryPort.class),
+                mock(SyncSessionPort.class),
+                mock(CockpitPreferencesPort.class)
+        );
+
+        assertThat(service).isInstanceOf(CockpitDemoResetService.class);
     }
 
     @Test

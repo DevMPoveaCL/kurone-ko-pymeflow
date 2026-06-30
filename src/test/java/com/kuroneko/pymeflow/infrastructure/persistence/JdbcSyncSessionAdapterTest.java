@@ -93,6 +93,37 @@ class JdbcSyncSessionAdapterTest {
     }
 
     @Test
+    void repeatedSyncIdUseKeepsExistingSessionAvailableForReportUpdates() {
+        var syncId = adapter.syncId(PROFILE_ID, "fixture-demo");
+
+        assertThat(adapter.syncId(PROFILE_ID, "fixture-demo")).isEqualTo(syncId);
+
+        adapter.recordReport(new SyncSessionPort.SyncSessionSnapshot(
+                syncId,
+                PROFILE_ID,
+                "fixture-demo",
+                SyncSessionPort.SyncStatus.COMPLETED,
+                1,
+                5,
+                5,
+                false,
+                false,
+                false,
+                Optional.empty(),
+                Optional.of(java.time.Instant.parse("2026-06-20T10:00:00Z")),
+                5,
+                List.of(),
+                Optional.empty(),
+                SyncSessionPort.Durability.DURABLE
+        ));
+
+        assertThat(adapter.findBySyncId(syncId)).hasValueSatisfying(snapshot -> {
+            assertThat(snapshot.status()).isEqualTo(SyncSessionPort.SyncStatus.COMPLETED);
+            assertThat(snapshot.sessionEntryCount()).isEqualTo(5);
+        });
+    }
+
+    @Test
     void rejectsNegativeCountAndAccumulatesEntryCountAtomically() {
         assertThatThrownBy(() -> adapter.incrementEntryCount(PROFILE_ID, "fixture-provider", -1))
                 .isInstanceOf(IllegalArgumentException.class)
