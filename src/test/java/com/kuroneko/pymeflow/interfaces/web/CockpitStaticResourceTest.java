@@ -6,6 +6,7 @@ import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMock
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.test.web.servlet.MockMvc;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.hamcrest.Matchers.containsString;
 import static org.hamcrest.Matchers.not;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
@@ -206,5 +207,86 @@ class CockpitStaticResourceTest {
                 .andExpect(content().string(not(containsString("safeError(error, \"No se pudo reiniciar la demo"))))
                 .andExpect(content().string(not(containsString("stack"))))
                 .andExpect(content().string(not(containsString("trace"))));
+    }
+
+    @Test
+    void servesCockpitWithGuidedDemoStepsInRequiredOrderAndTargets() throws Exception {
+        String html = mockMvc.perform(get("/index.html"))
+                .andExpect(status().isOk())
+                .andExpect(content().string(containsString("aria-label=\"Gu")))
+                .andExpect(content().string(containsString("id=\"demo-guide\"")))
+                .andExpect(content().string(containsString("data-guide-step=\"reset\"")))
+                .andExpect(content().string(containsString("data-guide-step=\"review\"")))
+                .andExpect(content().string(containsString("data-guide-step=\"categorize\"")))
+                .andExpect(content().string(containsString("data-guide-step=\"project\"")))
+                .andExpect(content().string(containsString("href=\"#demo-reset-btn\"")))
+                .andExpect(content().string(containsString("href=\"#revision\"")))
+                .andExpect(content().string(containsString("href=\"#revision\"")))
+                .andExpect(content().string(containsString("href=\"#proyeccion\"")))
+                .andReturn()
+                .getResponse()
+                .getContentAsString();
+
+        assertThat(html.indexOf("Reiniciar demo")).isLessThan(html.indexOf("Revisar pendientes"));
+        assertThat(html.indexOf("Revisar pendientes")).isLessThan(html.indexOf("Categorizar"));
+        assertThat(html.indexOf("Categorizar")).isLessThan(html.indexOf("Proyectar caja"));
+    }
+
+    @Test
+    void servesGuidedDemoWithSafeSpanishCopyAndNoLiveProviderClaims() throws Exception {
+        mockMvc.perform(get("/index.html"))
+                .andExpect(status().isOk())
+                .andExpect(content().string(containsString("demo-guide-title")))
+                .andExpect(content().string(containsString("datos simulados")))
+                .andExpect(content().string(containsString("solo orienta la demo")))
+                .andExpect(content().string(containsString("No guarda avance")))
+                .andExpect(content().string(not(containsString("conectividad bancaria real habilitada"))))
+                .andExpect(content().string(not(containsString("proveedor real conectado"))))
+                .andExpect(content().string(not(containsString("bank-live"))))
+                .andExpect(content().string(not(containsString("live bank"))));
+
+        mockMvc.perform(get("/app.js"))
+                .andExpect(status().isOk())
+                .andExpect(content().string(containsString("actualizada")))
+                .andExpect(content().string(not(containsString("conectividad bancaria real habilitada"))))
+                .andExpect(content().string(not(containsString("proveedor real conectado"))))
+                .andExpect(content().string(not(containsString("bank-live"))))
+                .andExpect(content().string(not(containsString("live bank"))));
+    }
+
+    @Test
+    void servesGuidedDemoScriptWithSessionOnlyStateAndNoFrontendDrift() throws Exception {
+        mockMvc.perform(get("/app.js"))
+                .andExpect(status().isOk())
+                .andExpect(content().string(containsString("guide: {")))
+                .andExpect(content().string(containsString("completed: new Set()")))
+                .andExpect(content().string(containsString("currentStep: \"reset\"")))
+                .andExpect(content().string(containsString("GUIDE_STEPS")))
+                .andExpect(content().string(containsString("markGuideStepComplete")))
+                .andExpect(content().string(containsString("renderGuideProgress")))
+                .andExpect(content().string(containsString("handleGuideClick")))
+                .andExpect(content().string(containsString("[data-guide-status-message]")))
+                .andExpect(content().string(not(containsString("localStorage"))))
+                .andExpect(content().string(not(containsString("sessionStorage"))))
+                .andExpect(content().string(not(containsString("/api/cockpit/demo/guide"))))
+                .andExpect(content().string(not(containsString("new WebSocket"))))
+                .andExpect(content().string(not(containsString("npm"))));
+    }
+
+    @Test
+    void servesGuidedDemoWithAccessibleStatusAndNonBlockingControls() throws Exception {
+        mockMvc.perform(get("/index.html"))
+                .andExpect(status().isOk())
+                .andExpect(content().string(containsString("<h2 id=\"demo-guide-title\">Gu")))
+                .andExpect(content().string(containsString("<ol class=\"guide-steps\"")))
+                .andExpect(content().string(containsString("aria-current=\"step\"")))
+                .andExpect(content().string(containsString("data-guide-status")))
+                .andExpect(content().string(containsString("data-guide-status-message")))
+                .andExpect(content().string(containsString("role=\"status\"")))
+                .andExpect(content().string(containsString("aria-live=\"polite\"")))
+                .andExpect(content().string(containsString("data-guide-target")))
+                .andExpect(content().string(containsString("data-action=\"manual-import\"")))
+                .andExpect(content().string(containsString("id=\"demo-reset-btn\"")))
+                .andExpect(content().string(containsString("data-projection-form")));
     }
 }

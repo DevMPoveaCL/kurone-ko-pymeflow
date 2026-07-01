@@ -32,6 +32,49 @@
     </nav>
 
     <main id="contenido" class="cockpit" tabindex="-1">
+        <section id="demo-guide" class="demo-guide" aria-labelledby="demo-guide-title" aria-label="Guía de demo">
+            <div class="guide-copy">
+                <p class="eyebrow">Demo guiada</p>
+                <h2 id="demo-guide-title">Guía de demo</h2>
+                <p>Recorre el cockpit con datos simulados fixture/demo. Esta guía solo orienta la demo: no bloquea acciones ni representa estado bancario real.</p>
+            </div>
+            <ol class="guide-steps" aria-label="Pasos sugeridos de la demo">
+                <li>
+                    <a href="#demo-reset-btn" data-guide-step="reset" data-guide-target="#demo-reset-btn" aria-current="step">
+                        <span class="guide-step-number">1</span>
+                        <strong>Reiniciar demo</strong>
+                        <span>Vuelve a sembrar evidencia fixture/demo.</span>
+                        <em data-guide-state="reset">Paso actual</em>
+                    </a>
+                </li>
+                <li>
+                    <a href="#revision" data-guide-step="review" data-guide-target="#revision">
+                        <span class="guide-step-number">2</span>
+                        <strong>Revisar pendientes</strong>
+                        <span>Observa movimientos pendientes antes de clasificar.</span>
+                        <em data-guide-state="review">Pendiente</em>
+                    </a>
+                </li>
+                <li>
+                    <a href="#revision" data-guide-step="categorize" data-guide-target="#revision">
+                        <span class="guide-step-number">3</span>
+                        <strong>Categorizar</strong>
+                        <span>Clasifica un movimiento con categorías activas.</span>
+                        <em data-guide-state="categorize">Pendiente</em>
+                    </a>
+                </li>
+                <li>
+                    <a href="#proyeccion" data-guide-step="project" data-guide-target="#proyeccion">
+                        <span class="guide-step-number">4</span>
+                        <strong>Proyectar caja</strong>
+                        <span>Calcula caja con saldo manual ingresado.</span>
+                        <em data-guide-state="project">Pendiente</em>
+                    </a>
+                </li>
+            </ol>
+            <p class="guide-status" role="status" aria-live="polite" data-guide-status-message>No guarda avance: progreso visible solo en esta sesión del navegador.</p>
+        </section>
+
         <section id="caja" class="hero-ledger" aria-label="Resumen de caja diaria" data-api-target="cash-summary">
             <div class="cash-card cash-card--primary" data-summary="balance">
                 <p class="card-label">Caja proyectada de hoy</p>
@@ -66,7 +109,7 @@
             <p class="state-line" role="status" data-api-target="demo-reset-status" aria-live="polite">Acción segura: solo reinicia datos fixture/demo del cockpit activo.</p>
         </section>
 
-        <section id="proyeccion" class="projection-panel" aria-label="Proyección de caja por período" data-api-target="projection-panel">
+        <section id="proyeccion" class="projection-panel" aria-label="Proyección de caja por período" data-api-target="projection-panel" tabindex="-1">
             <div class="projection-copy">
                 <p class="eyebrow">Proyección</p>
                 <h2>Cómo se ve la caja esta semana o este mes</h2>
@@ -125,7 +168,7 @@
             </section>
         </div>
 
-        <section id="revision" class="review-panel" aria-label="Revisión manual y estados seguros">
+        <section id="revision" class="review-panel" aria-label="Revisión manual y estados seguros" tabindex="-1">
             <div>
                 <p class="eyebrow">Revisión</p>
                 <h2>Movimientos pendientes de revisión</h2>

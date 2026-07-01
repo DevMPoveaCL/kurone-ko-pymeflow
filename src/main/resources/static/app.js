@@ -23,6 +23,11 @@
         preferencesLoaded: false,
         preferenceSaveTimer: null,
         resolvingMovementIds: new Set(),
+        guide: {
+            currentStep: "reset",
+            completed: new Set(),
+            lastMessage: "No guarda avance: progreso visible solo en esta sesión del navegador.",
+        },
     };
 
     const SAMPLE_ROWS = [
@@ -32,12 +37,21 @@
         { rowNumber: 4, description: "", amount: 0, currency: "CLP", date: "2026-06-18", externalReference: "cockpit-invalid-001", movementDirection: "DEBIT" },
     ];
 
+    const GUIDE_STEPS = [
+        { key: "reset", label: "Reiniciar demo", next: "Revisar pendientes" },
+        { key: "review", label: "Revisar pendientes", next: "Categorizar" },
+        { key: "categorize", label: "Categorizar", next: "Proyectar caja" },
+        { key: "project", label: "Proyectar caja", next: null },
+    ];
+
     const $ = (selector) => document.querySelector(selector);
     const target = (name) => $(`[data-api-target="${name}"]`);
     const money = new Intl.NumberFormat("es-CL", { style: "currency", currency: "CLP", maximumFractionDigits: 0 });
 
     document.addEventListener("DOMContentLoaded", () => {
+        renderGuideProgress();
         loadInitialData();
+        $("#demo-guide")?.addEventListener("click", handleGuideClick);
         $(`[data-action="manual-import"]`)?.addEventListener("click", runManualImport);
         $(`[data-action="provider-sync"]`)?.addEventListener("click", runProviderSync);
         $("#demo-reset-btn")?.addEventListener("click", runDemoReset);
@@ -209,6 +223,7 @@
         const dailyBalances = projection.dailyBalances || [];
         if (!dailyBalances.length) {
             setState(results, "empty", "Categoriza movimientos primero para proyectar caja.");
+            markGuideStepComplete("project", "Proyección consultada con saldo manual. Guía completa para esta sesión demo.");
             return;
         }
         const totals = summarizeProjection(dailyBalances);
@@ -229,6 +244,7 @@
                 ${dailyBalances.map(renderDailyBalance).join("")}
             </div>
         </div>`;
+        markGuideStepComplete("project", "Proyección calculada con saldo manual. Guía actualizada para esta sesión demo.");
     }
 
     function summarizeProjection(dailyBalances) {
@@ -323,6 +339,7 @@
             }
             await refreshCockpitEvidence();
             setState(status, "success", "Demo reiniciada. Evidencia visible actualizada con datos fixture/demo.");
+            markGuideStepComplete("reset", "Demo reiniciada con datos fixture/demo. Guía actualizada: revisa pendientes.");
         } catch (error) {
             setState(status, "error", "No se pudo reiniciar la demo. Los datos visibles se mantienen.");
         } finally {
@@ -395,6 +412,7 @@
         const container = target("manual-review-list");
         if (!manualReview.length) {
             setState(container, "empty", "Sin movimientos pendientes de revisión.");
+            markGuideStepComplete("review", "Revisión cargada sin movimientos pendientes. Guía actualizada: continúa con proyección si hay datos categorizados.");
             return;
         }
         if (!state.categories.length) {
@@ -402,6 +420,7 @@
             return;
         }
         container.innerHTML = `<div class="manual-review-list" role="list">${manualReview.map(renderManualReviewMovement).join("")}</div>`;
+        markGuideStepComplete("review", "Movimientos pendientes visibles. Guía actualizada: categoriza un movimiento.");
     }
 
     function renderMovement(movement) {
@@ -478,6 +497,7 @@
                 sourceReference: movement.sourceReference,
             });
             setInlineMessage(message, "success", "Movimiento categorizado correctamente.");
+            markGuideStepComplete("categorize", "Movimiento categorizado correctamente. Guía actualizada: proyecta caja.");
             await refreshCockpitEvidence();
         } catch (error) {
             setInlineMessage(message, "error", safeError(error, "No se pudo categorizar el movimiento. Intenta nuevamente."));
@@ -500,6 +520,47 @@
         const refreshes = [renderMovementEvidence(), renderRecommendations()];
         if (balance !== null) refreshes.push(fetchProjection(balance));
         await Promise.allSettled(refreshes);
+    }
+
+    function handleGuideClick(event) {
+        const link = event.target.closest("[data-guide-target]");
+        if (!link) return;
+        const destination = $(link.dataset.guideTarget);
+        if (!destination) return;
+        event.preventDefault();
+        destination.scrollIntoView({ behavior: "smooth", block: "start" });
+        destination.focus({ preventScroll: true });
+    }
+
+    function markGuideStepComplete(stepKey, message) {
+        if (!GUIDE_STEPS.some((step) => step.key === stepKey)) return;
+        state.guide.completed.add(stepKey);
+        const nextStep = GUIDE_STEPS.find((step) => !state.guide.completed.has(step.key));
+        state.guide.currentStep = nextStep?.key || stepKey;
+        state.guide.lastMessage = message || nextGuideMessage();
+        renderGuideProgress();
+    }
+
+    function renderGuideProgress() {
+        GUIDE_STEPS.forEach((step) => {
+            const link = $(`[data-guide-step="${step.key}"]`);
+            const stateLabel = $(`[data-guide-state="${step.key}"]`);
+            if (!link || !stateLabel) return;
+            const complete = state.guide.completed.has(step.key);
+            const current = state.guide.currentStep === step.key && !complete;
+            link.dataset.guideStatus = complete ? "complete" : current ? "current" : "pending";
+            if (current) link.setAttribute("aria-current", "step");
+            else link.removeAttribute("aria-current");
+            stateLabel.textContent = complete ? "Completado" : current ? "Paso actual" : "Pendiente";
+        });
+        const status = $("[data-guide-status-message]");
+        if (status) status.textContent = state.guide.lastMessage || nextGuideMessage();
+    }
+
+    function nextGuideMessage() {
+        const current = GUIDE_STEPS.find((step) => step.key === state.guide.currentStep);
+        if (!current?.next) return "Guía actualizada: la secuencia demo quedó completa en esta sesión.";
+        return `Guía actualizada: sigue con ${current.next}. Avance solo visible en esta sesión demo.`;
     }
 
     function renderRecommendation(signal) {
