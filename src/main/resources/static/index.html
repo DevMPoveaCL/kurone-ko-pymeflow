@@ -3,8 +3,10 @@
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>PymeFlow | Cockpit de caja diaria</title>
+    <meta name="color-scheme" content="light dark">
+    <title>PymeFlow | Dashboard de caja</title>
     <meta name="description" content="Cockpit estático para revisar caja diaria, abonos, cargos y sincronizaciones fixture/demo de PymeFlow.">
+    <link rel="icon" type="image/png" href="/favicon.png">
     <link rel="stylesheet" href="/styles.css">
     <script src="/app.js" defer></script>
 </head>
@@ -13,22 +15,27 @@
 
     <header class="topbar" aria-label="Identidad del producto">
         <div>
+            <img class="brand-lockup" src="/branding.png" width="240" height="72" alt="PymeFlow">
             <p class="eyebrow">PymeFlow · MVP cockpit</p>
-            <h1>Caja diaria para PyMEs chilenas</h1>
-            <p class="lead">Una vista operativa para revisar abonos, cargos, cartola y comprobantes de sincronización simulada.</p>
+            <h1>Dashboard de caja</h1>
+            <p class="lead">Caja diaria con datos fixture/demo: entradas, salidas, pendientes y proyección.</p>
         </div>
         <aside class="status-note" aria-label="Alcance de conectividad">
             <strong>Modo seguro demo</strong>
             <span>Sincronización fixture/demo. No representa conectividad bancaria real.</span>
+            <button id="theme-toggle" class="theme-toggle" type="button" data-theme-toggle aria-pressed="false" aria-label="Cambiar tema visual">
+                <span data-theme-toggle-label>Preferencia visual: Sigue el sistema</span>
+                <small>No afecta datos ni avance demo</small>
+            </button>
         </aside>
     </header>
 
     <nav class="quick-nav" aria-label="Secciones del cockpit">
         <a href="#caja">Caja</a>
+        <a href="#caja">Entradas</a>
+        <a href="#caja">Salidas</a>
+        <a href="#revision">Pendientes</a>
         <a href="#proyeccion">Proyección</a>
-        <a href="#comprobantes">Comprobantes</a>
-        <a href="#cartola">Cartola</a>
-        <a href="#revision">Revisión</a>
     </nav>
 
     <main id="contenido" class="cockpit" tabindex="-1">
@@ -36,14 +43,14 @@
             <div class="guide-copy">
                 <p class="eyebrow">Demo guiada</p>
                 <h2 id="demo-guide-title">Guía de demo</h2>
-                <p>Recorre el cockpit con datos simulados fixture/demo. Esta guía solo orienta la demo: no bloquea acciones ni representa estado bancario real.</p>
+                <p>Usa datos simulados. La guía orienta la demo y no representa estado bancario real.</p>
             </div>
             <ol class="guide-steps" aria-label="Pasos sugeridos de la demo">
                 <li>
                     <a href="#demo-reset-btn" data-guide-step="reset" data-guide-target="#demo-reset-btn" aria-current="step">
                         <span class="guide-step-number">1</span>
                         <strong>Reiniciar demo</strong>
-                        <span>Vuelve a sembrar evidencia fixture/demo.</span>
+                        <span>Siembra datos demo.</span>
                         <em data-guide-state="reset">Paso actual</em>
                     </a>
                 </li>
@@ -51,7 +58,7 @@
                     <a href="#revision" data-guide-step="review" data-guide-target="#revision">
                         <span class="guide-step-number">2</span>
                         <strong>Revisar pendientes</strong>
-                        <span>Observa movimientos pendientes antes de clasificar.</span>
+                        <span>Observa pendientes.</span>
                         <em data-guide-state="review">Pendiente</em>
                     </a>
                 </li>
@@ -59,7 +66,7 @@
                     <a href="#revision" data-guide-step="categorize" data-guide-target="#revision">
                         <span class="guide-step-number">3</span>
                         <strong>Categorizar</strong>
-                        <span>Clasifica un movimiento con categorías activas.</span>
+                        <span>Elige una categoría.</span>
                         <em data-guide-state="categorize">Pendiente</em>
                     </a>
                 </li>
@@ -67,7 +74,7 @@
                     <a href="#proyeccion" data-guide-step="project" data-guide-target="#proyeccion">
                         <span class="guide-step-number">4</span>
                         <strong>Proyectar caja</strong>
-                        <span>Calcula caja con saldo manual ingresado.</span>
+                        <span>Usa saldo manual.</span>
                         <em data-guide-state="project">Pendiente</em>
                     </a>
                 </li>
@@ -77,48 +84,48 @@
 
         <section id="caja" class="hero-ledger" aria-label="Resumen de caja diaria" data-api-target="cash-summary">
             <div class="cash-card cash-card--primary" data-summary="balance">
-                <p class="card-label">Caja proyectada de hoy</p>
+                <p class="card-label">Caja</p>
                 <p class="amount" data-field="projected-balance">Sin datos</p>
                 <p class="card-copy" data-field="profile-label">Cargando perfil activo y movimientos projection-ready.</p>
             </div>
 
             <div class="cash-card" data-summary="credit">
-                <p class="card-label">Abonos visibles</p>
+                <p class="card-label">Entradas</p>
                 <p class="amount amount--credit" data-field="credit-total">Sin datos</p>
-                <p class="card-copy">Entradas positivas en CLP con dirección CREDIT.</p>
+                <p class="card-copy">Abonos CREDIT listos para proyección.</p>
             </div>
 
             <div class="cash-card" data-summary="debit">
-                <p class="card-label">Cargos por revisar</p>
+                <p class="card-label">Salidas</p>
                 <p class="amount amount--debit" data-field="debit-total">Sin datos</p>
-                <p class="card-copy">Salidas positivas en CLP con dirección DEBIT.</p>
+                <p class="card-copy">Cargos DEBIT listos para proyección.</p>
             </div>
         </section>
 
         <section class="actions-panel" aria-label="Acciones principales del cockpit" data-api-target="actions-panel">
             <div>
                 <p class="eyebrow">Flujo seguro MVP</p>
-                <h2>Revisión antes de proyectar caja</h2>
-                <p>Estas acciones llaman APIs same-origin existentes con datos fixture/demo para evidenciar importación, historial y sync segura.</p>
+                <h2>Acciones demo</h2>
+                <p>APIs same-origin con datos fixture/demo; sin banco real.</p>
             </div>
             <div class="button-row" aria-label="Acciones de caja">
-                <button type="button" data-action="manual-import">Revisar abonos y cargos con muestra manual</button>
+                <button type="button" data-action="manual-import">Revisar abonos y cargos</button>
                 <button type="button" class="button-secondary" data-action="provider-sync">Ejecutar sync fixture</button>
                 <button id="demo-reset-btn" type="button" class="button-secondary">Reiniciar demo</button>
             </div>
-            <p class="state-line" role="status" data-api-target="demo-reset-status" aria-live="polite">Acción segura: solo reinicia datos fixture/demo del cockpit activo.</p>
+            <p class="state-line demo-reset-status" role="status" data-api-target="demo-reset-status" aria-live="polite" tabindex="-1">Acción segura: solo reinicia datos fixture/demo del cockpit activo.</p>
         </section>
 
         <section id="proyeccion" class="projection-panel" aria-label="Proyección de caja por período" data-api-target="projection-panel" tabindex="-1">
             <div class="projection-copy">
                 <p class="eyebrow">Proyección</p>
-                <h2>Cómo se ve la caja esta semana o este mes</h2>
-                <p>Usa movimientos categorizados y listos para proyección. El saldo inicial es ingresado por el usuario: no viene de una conexión bancaria en vivo.</p>
+                <h2>Proyección</h2>
+                <p>Usa movimientos listos y saldo manual. No viene de banca en vivo.</p>
             </div>
             <form class="projection-controls" data-projection-form>
                 <label for="opening-balance">Saldo inicial manual, no bancario</label>
                 <input id="opening-balance" name="openingBalance" type="number" min="0" step="1000" inputmode="numeric" placeholder="Ej: 350000" aria-describedby="opening-balance-help">
-                <p id="opening-balance-help">Monto ingresado por el usuario para simular la caja disponible. No es saldo bancario en vivo ni saldo bancario real.</p>
+                <p id="opening-balance-help">Monto ingresado por el usuario. No es saldo bancario en vivo ni saldo bancario real.</p>
                 <p class="state-line" role="status" data-api-target="preferences-status" aria-live="polite">Preferencias manuales pendientes de carga.</p>
 
                 <fieldset>
@@ -139,7 +146,7 @@
                 <div class="section-heading">
                     <p class="eyebrow">Comprobantes</p>
                     <h2>Sincronización fixture/demo</h2>
-                    <p>Riel tipo boleta para dejar evidencia visible sin exponer datos técnicos sensibles del proveedor.</p>
+                    <p>Evidencia visible sin datos técnicos sensibles del proveedor.</p>
                 </div>
 
                 <article class="receipt" aria-labelledby="sync-title" data-api-target="sync-receipt" aria-live="polite">
@@ -159,7 +166,7 @@
                 <div class="section-heading">
                     <p class="eyebrow">Cartola</p>
                     <h2>Cartola de movimientos</h2>
-                    <p>Filas estáticas para validar dirección de movimiento, monto CLP positivo e historia de caja.</p>
+                    <p>Dirección, monto CLP positivo e historia de caja.</p>
                 </div>
 
                 <div class="ledger-list" role="list" aria-label="Movimientos de caja" data-api-target="ledger-list" aria-live="polite">
@@ -171,20 +178,20 @@
         <section id="revision" class="review-panel" aria-label="Revisión manual y estados seguros" tabindex="-1">
             <div>
                 <p class="eyebrow">Revisión</p>
-                <h2>Movimientos pendientes de revisión</h2>
-                <p>Selecciona una categoría activa para clasificar cada movimiento sin mezclar la dirección bancaria DEBIT/CREDIT con la clasificación INFLOW/OUTFLOW.</p>
+                <h2>Pendientes</h2>
+                <p>Clasifica cada movimiento sin mezclar DEBIT/CREDIT con INFLOW/OUTFLOW.</p>
             </div>
             <div class="review-grid">
                 <section class="review-column" aria-label="Movimientos pendientes de revisión manual">
                     <h3>Movimientos pendientes de revisión</h3>
-                    <p class="review-help">Selecciona una categoría y usa “Categorizar movimiento” para dejarlo listo para proyección. Sin movimientos pendientes de revisión se mostrará un estado seguro.</p>
+                    <p class="review-help">Elige una categoría y deja el movimiento listo para proyección.</p>
                     <div class="empty-state" role="status" data-api-target="manual-review-list" aria-live="polite">
                         Cargando movimientos pendientes de revisión.
                     </div>
                 </section>
                 <section class="review-column" aria-label="Recomendaciones de caja">
                     <h3>Recomendaciones</h3>
-                    <p class="review-help">Evidencia separada: las recomendaciones no reemplazan la cola de revisión manual.</p>
+                    <p class="review-help">Evidencia separada de la cola manual.</p>
                     <div class="empty-state" role="status" data-api-target="recommendation-list" aria-live="polite">
                         Cargando recomendaciones.
                     </div>

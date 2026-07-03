@@ -1,5 +1,6 @@
 (() => {
     const PROFILE_ID = "pharmacy-cl";
+    const THEME_STORAGE_KEY = "pymeflow.theme";
     const API = {
         activeProfile: "/api/profiles/active",
         activeCategories: "/api/profiles/active/categories",
@@ -19,6 +20,7 @@
         projection: {
             horizonDays: 7,
             openingBalance: null,
+            projectableMovementDates: [],
         },
         preferencesLoaded: false,
         preferenceSaveTimer: null,
@@ -49,6 +51,7 @@
     const money = new Intl.NumberFormat("es-CL", { style: "currency", currency: "CLP", maximumFractionDigits: 0 });
 
     document.addEventListener("DOMContentLoaded", () => {
+        setupThemePreference();
         renderGuideProgress();
         loadInitialData();
         $("#demo-guide")?.addEventListener("click", handleGuideClick);
@@ -62,6 +65,55 @@
             control.addEventListener("change", handleProjectionPeriodChange);
         });
     });
+
+    function setupThemePreference() {
+        applyThemePreference(resolveThemePreference());
+        const toggle = $("#theme-toggle");
+        toggle?.addEventListener("click", () => {
+            const currentTheme = document.documentElement.dataset.theme || resolveThemePreference();
+            const nextTheme = currentTheme === "dark" ? "light" : "dark";
+            safeLocalStorage(() => localStorage.setItem(THEME_STORAGE_KEY, nextTheme));
+            applyThemePreference(nextTheme);
+        });
+
+        window.matchMedia("(prefers-color-scheme: dark)").addEventListener?.("change", () => {
+            if (!readStoredTheme()) applyThemePreference(resolveThemePreference());
+        });
+    }
+
+    function resolveThemePreference() {
+        return readStoredTheme() || preferredSystemTheme();
+    }
+
+    function readStoredTheme() {
+        return safeLocalStorage(() => {
+            const value = localStorage.getItem(THEME_STORAGE_KEY);
+            return value === "light" || value === "dark" ? value : null;
+        }) || null;
+    }
+
+    function preferredSystemTheme() {
+        return window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
+    }
+
+    function applyThemePreference(theme) {
+        document.documentElement.dataset.theme = theme;
+        const toggle = $("#theme-toggle");
+        const label = $("[data-theme-toggle-label]");
+        if (!toggle || !label) return;
+        const dark = theme === "dark";
+        toggle.setAttribute("aria-pressed", String(dark));
+        toggle.setAttribute("aria-label", dark ? "Cambiar a tema claro" : "Cambiar a tema oscuro");
+        label.textContent = dark ? "Preferencia visual: Tema oscuro" : "Preferencia visual: Tema claro";
+    }
+
+    function safeLocalStorage(callback) {
+        try {
+            return callback();
+        } catch (error) {
+            return null;
+        }
+    }
 
     async function loadInitialData() {
         await loadCockpitPreferences();
@@ -127,8 +179,9 @@
                 getJson(API.projectionReady),
                 getJson(API.manualReview),
             ]);
+            state.projection.projectableMovementDates = projectionReady.map((movement) => movement.date).filter(Boolean);
             const movements = [...projectionReady, ...manualReview];
-            updateCashTotals(movements);
+            updateCashTotals(projectionReady);
             renderLedger(movements);
             renderManualReview(manualReview);
         } catch (error) {
@@ -207,7 +260,7 @@
         try {
             const params = new URLSearchParams({
                 profileId: PROFILE_ID,
-                startDate: todayIsoDate(),
+                startDate: chooseProjectionStartDate(state.projection.projectableMovementDates, state.projection.horizonDays),
                 horizonDays: String(state.projection.horizonDays),
                 openingBalance: String(openingBalance),
             });
@@ -222,7 +275,10 @@
         const results = target("projection-results");
         const dailyBalances = projection.dailyBalances || [];
         if (!dailyBalances.length) {
-            setState(results, "empty", "Categoriza movimientos primero para proyectar caja.");
+            const message = hasProjectableMovements()
+                    ? "Hay movimientos listos, pero fuera del período seleccionado."
+                    : "Categoriza movimientos para proyectar la caja.";
+            setState(results, "empty", message);
             markGuideStepComplete("project", "Proyección consultada con saldo manual. Guía completa para esta sesión demo.");
             return;
         }
@@ -338,8 +394,9 @@
                 await renderSyncStatus(response.syncSessionId);
             }
             await refreshCockpitEvidence();
-            setState(status, "success", "Demo reiniciada. Evidencia visible actualizada con datos fixture/demo.");
-            markGuideStepComplete("reset", "Demo reiniciada con datos fixture/demo. Guía actualizada: revisa pendientes.");
+            setState(status, "success", "Demo reiniciada. Caja proyectada actualizada solo con movimientos listos para proyección.");
+            focusStatus(status);
+            markGuideStepComplete("reset", "Demo reiniciada con datos fixture/demo. Caja proyectada usa solo movimientos listos para proyección. Revisa pendientes separados antes de proyectar.");
         } catch (error) {
             setState(status, "error", "No se pudo reiniciar la demo. Los datos visibles se mantienen.");
         } finally {
@@ -517,7 +574,10 @@
     async function refreshCockpitEvidence() {
         await Promise.allSettled([loadCockpitPreferences(), renderProfileAndCategories()]);
         const balance = readOpeningBalance();
-        const refreshes = [renderMovementEvidence(), renderRecommendations()];
+        const movementEvidence = renderMovementEvidence();
+        const recommendations = renderRecommendations();
+        await movementEvidence;
+        const refreshes = [recommendations];
         if (balance !== null) refreshes.push(fetchProjection(balance));
         await Promise.allSettled(refreshes);
     }
@@ -608,6 +668,12 @@
         element.innerHTML = `<div class="${className}" role="status">${escapeHtml(message)}</div>`;
     }
 
+    function focusStatus(element) {
+        if (!element) return;
+        element.scrollIntoView({ behavior: "smooth", block: "center" });
+        element.focus({ preventScroll: true });
+    }
+
     function setBusy(button, busy) {
         if (!button) return;
         button.disabled = busy;
@@ -641,6 +707,27 @@
 
     function todayIsoDate() {
         return new Date().toISOString().slice(0, 10);
+    }
+
+    function chooseProjectionStartDate(projectableMovementDates, horizonDays) {
+        const today = todayIsoDate();
+        const validDates = projectableMovementDates
+                .filter((date) => /^\d{4}-\d{2}-\d{2}$/.test(date))
+                .sort();
+        if (!validDates.length) return today;
+        const horizonEnd = addDaysIso(today, Number(horizonDays || 7) - 1);
+        const hasDateInSelectedPeriod = validDates.some((date) => date >= today && date <= horizonEnd);
+        return hasDateInSelectedPeriod ? today : validDates[0];
+    }
+
+    function addDaysIso(isoDate, days) {
+        const date = new Date(`${isoDate}T00:00:00.000Z`);
+        date.setUTCDate(date.getUTCDate() + days);
+        return date.toISOString().slice(0, 10);
+    }
+
+    function hasProjectableMovements() {
+        return state.projection.projectableMovementDates.length > 0;
     }
 
     function text(selector, value) {
