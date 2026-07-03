@@ -390,6 +390,24 @@ class CockpitStaticResourceTest {
     }
 
     @Test
+    void servesDashboardStylesWithRuntimeSafeDesktopCompactShellAndReviewOverflowContracts() throws Exception {
+        String css = mockMvc.perform(get("/styles.css"))
+                .andExpect(status().isOk())
+                .andReturn()
+                .getResponse()
+                .getContentAsString();
+
+        assertThat(css).contains("@media (min-width: 861px) and (max-height: 820px)");
+        assertThat(css).contains(".primary-shell { max-height: calc(100dvh - 12.5rem); overflow: hidden;");
+        assertThat(css).contains(".shell-projection,");
+        assertThat(css).contains(".shell-review { min-height: 0; overflow: auto; }");
+        assertThat(css).contains(".review-panel, .review-grid, .review-column, .manual-review-list, .movement, .movement-main { min-width: 0; max-width: 100%; }");
+        assertThat(css).contains(".movement--review { grid-template-columns: minmax(0, 1fr) minmax(0, auto); }");
+        assertThat(css).doesNotContain("minmax(220px");
+        assertThat(css).doesNotContain("minmax(260px");
+    }
+
+    @Test
     void servesDashboardWithConcisePrimaryCopyAndSecondaryEvidenceBelowFold() throws Exception {
         String html = mockMvc.perform(get("/index.html"))
                 .andExpect(status().isOk())
@@ -494,6 +512,105 @@ class CockpitStaticResourceTest {
         assertThat(html).doesNotContain("La guía orienta la demo");
         assertThat(html).doesNotContain("Observa cómo se pobla");
         assertThat(html).doesNotContain("Aprende el flujo completo");
+    }
+
+    @Test
+    void servesDashboardWithoutVisibleTutorialGuideInPrimaryShell() throws Exception {
+        String html = mockMvc.perform(get("/index.html"))
+                .andExpect(status().isOk())
+                .andReturn()
+                .getResponse()
+                .getContentAsString();
+
+        assertThat(html).contains("<details id=\"demo-guide\" class=\"demo-guide\"");
+        assertThat(html).contains("data-guide-step=\"reset\"");
+        assertThat(html).contains("data-guide-target=\"#demo-reset-btn\"");
+        assertThat(html).doesNotContain("Demo guiada");
+        assertThat(html).doesNotContain("DEMO GUIADA");
+        assertThat(html).doesNotContain("Guía de demo");
+    }
+
+    @Test
+    void servesDashboardMobileShellWithFullWidthWorkspaceAndNoOverflowPatterns() throws Exception {
+        String css = mockMvc.perform(get("/styles.css"))
+                .andExpect(status().isOk())
+                .andReturn()
+                .getResponse()
+                .getContentAsString();
+
+        assertThat(css).contains(".module-workspace { width: 100%;");
+        assertThat(css).contains(".module-panel { width: 100%;");
+        assertThat(css).contains(".module-tabs button { flex: 0 0 auto;");
+        assertThat(css).contains("@media (max-width: 520px)");
+        assertThat(css).contains(".module-tabs button { width: auto;");
+        assertThat(css).contains(".dashboard-shell { width: 100%;");
+        assertThat(css).contains(".shell-metrics, .shell-workflow, .shell-projection, .shell-review { grid-area: auto; }");
+        assertThat(css).doesNotContain("transform: translateX");
+        assertThat(css).doesNotContain("margin-left: 100vw");
+    }
+
+    @Test
+    void servesDashboardWithBoundedReviewEvidenceInsteadOfNoisyPrimaryList() throws Exception {
+        String css = mockMvc.perform(get("/styles.css"))
+                .andExpect(status().isOk())
+                .andReturn()
+                .getResponse()
+                .getContentAsString();
+
+        assertThat(css).contains(".review-grid { min-height: 0;");
+        assertThat(css).contains(".manual-review-list { max-height:");
+        assertThat(css).contains(".manual-review-list { overflow: auto;");
+        assertThat(css).contains(".recommendation-list { max-height:");
+    }
+
+    @Test
+    void servesDashboardWithBoundedDesktopShellAndWorkspaceInsideViewportContracts() throws Exception {
+        String css = mockMvc.perform(get("/styles.css"))
+                .andExpect(status().isOk())
+                .andReturn()
+                .getResponse()
+                .getContentAsString();
+
+        assertThat(css).contains("height: 100dvh");
+        assertThat(css).contains("padding-bottom: 0");
+        assertThat(css).contains(".primary-shell { min-height: 0; overflow: hidden;");
+        assertThat(css).contains(".module-workspace { min-height: 0; overflow: hidden;");
+        assertThat(css).contains(".module-panel { min-height: 0; max-height: 100%; overflow: auto;");
+        assertThat(css).contains(".review-panel { grid-template-rows: auto minmax(0, 1fr);");
+        assertThat(css).contains(".review-grid { min-height: 0; overflow: hidden;");
+        assertThat(css).contains(".manual-review-list { max-height: min(100%, 22rem);");
+        assertThat(css).doesNotContain("padding-bottom: 2rem");
+        assertThat(css).doesNotContain(".module-panel { max-height: none; overflow: visible; }");
+    }
+
+    @Test
+    void servesDashboardWithCompactMobileAppShellOrderingAndInternalScrollContracts() throws Exception {
+        String css = mockMvc.perform(get("/styles.css"))
+                .andExpect(status().isOk())
+                .andReturn()
+                .getResponse()
+                .getContentAsString();
+
+        int mobileStart = css.indexOf("@media (max-width: 520px)");
+        assertThat(mobileStart).isGreaterThanOrEqualTo(0);
+        String mobile = css.substring(mobileStart);
+
+        assertThat(mobile).contains(".dashboard-shell { height: 100dvh; padding-inline: 10px; gap: 0.4rem; }");
+        assertThat(mobile).contains(".topbar { grid-template-columns: minmax(0, 1fr) auto; gap: 0.45rem; align-items: center; padding-top: 0.35rem; }");
+        assertThat(mobile).contains(".brand-lockup { height: 34px; max-height: 34px;");
+        assertThat(mobile).contains("h1 { font-size: 1.35rem;");
+        assertThat(mobile).contains(".lead { display: none; }");
+        assertThat(mobile).contains(".status-note { padding: 0.45rem; gap: 0.15rem;");
+        assertThat(mobile).contains(".shell-metrics { display: flex; overflow-x: auto;");
+        assertThat(mobile).contains(".cash-card { flex: 0 0 min(72vw, 210px);");
+        assertThat(mobile).contains(".primary-shell { min-height: 0; overflow: hidden; }");
+        assertThat(mobile).contains(".module-workspace { min-height: 0; overflow: hidden; }");
+        assertThat(mobile).contains(".module-panel { min-height: 0; max-height: 100%; overflow: auto; }");
+        assertThat(mobile).contains(".demo-guide { display: none; }");
+        assertThat(mobile).contains(".manual-review-list, .recommendation-list { max-height: 12rem; overflow: auto; }");
+        assertThat(mobile).doesNotContain(".dashboard-shell { overflow: visible; }");
+        assertThat(mobile).doesNotContain(".module-workspace { overflow: visible; }");
+        assertThat(mobile).doesNotContain("width: 100vw");
     }
 
     @Test

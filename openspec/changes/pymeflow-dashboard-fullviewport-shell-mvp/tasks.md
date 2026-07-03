@@ -43,8 +43,8 @@ Chain strategy: stacked-to-main
 - [x] 3.3 Browser smoke 390x844: tabs reachable, controls stack, keyboard order logical, and `scrollWidth <= clientWidth`.
 - [x] 3.4 Remediate viewport smoke regressions with RED-first static contracts for bounded desktop shell, compact mobile ordering, internal evidence scrolling, and no horizontal overflow patterns.
 
-## Phase 4: PR2 Detail Polish (if needed)
+## Phase 4: PR2 Fullviewport Hardening
 
-- [ ] 4.1 Add RED tests for `src/main/resources/static/index.html` drawer/dialog semantics: labelled title, close control, hidden inactive detail host, Escape/focus-return contract.
-- [ ] 4.2 Implement drawer/modal/detail polish in `index.html`, `styles.css`, and minimal `app.js` without touching backend/API contracts.
-- [ ] 4.3 Run `./gradlew.bat test --rerun-tasks` and repeat desktop/mobile browser smoke before verify handoff.
+- [x] 4.1 Add RED tests for hidden/demoted tutorial treatment, bounded desktop shell, compact mobile shell ordering, internal evidence scrolling, and no horizontal-overflow patterns.
+- [x] 4.2 Implement final viewport hardening in `styles.css` without touching backend/API contracts.
+- [x] 4.3 Run focused static verification and preserve desktop/mobile smoke evidence before verify handoff.
