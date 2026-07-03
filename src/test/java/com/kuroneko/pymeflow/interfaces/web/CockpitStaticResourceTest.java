@@ -37,9 +37,9 @@ class CockpitStaticResourceTest {
                 .andExpect(content().string(containsString("caja diaria")))
                 .andExpect(content().string(containsString("abonos")))
                 .andExpect(content().string(containsString("cargos")))
-                .andExpect(content().string(containsString("Cartola de movimientos")))
+                .andExpect(content().string(containsString("Cartola")))
                 .andExpect(content().string(containsString("fixture/demo")))
-                .andExpect(content().string(containsString("No representa conectividad bancaria real")))
+                .andExpect(content().string(containsString("Datos demo/manuales")))
                 .andExpect(content().string(not(containsString("mostrador"))))
                 .andExpect(content().string(not(containsString("conectividad bancaria real habilitada"))));
     }
@@ -104,10 +104,11 @@ class CockpitStaticResourceTest {
                 .andExpect(content().string(containsString("data-theme-toggle")))
                 .andExpect(content().string(containsString("aria-pressed=\"false\"")))
                 .andExpect(content().string(containsString("aria-label=\"Cambiar tema visual")))
-                .andExpect(content().string(containsString("Preferencia visual")))
                 .andExpect(content().string(containsString("data-theme-toggle-label")))
-                .andExpect(content().string(containsString("Sigue el sistema")))
-                .andExpect(content().string(containsString("No afecta datos ni avance demo")));
+                .andExpect(content().string(containsString("Modo claro")))
+                .andExpect(content().string(not(containsString("Preferencia visual"))))
+                .andExpect(content().string(not(containsString("Sigue el sistema"))))
+                .andExpect(content().string(not(containsString("No afecta datos ni avance demo"))));
     }
 
     @Test
@@ -198,7 +199,7 @@ class CockpitStaticResourceTest {
                 .andExpect(status().isOk())
                 .andExpect(content().string(containsString("aria-label=\"Resumen de caja diaria\"")))
                 .andExpect(content().string(containsString("Riel de comprobantes")))
-                .andExpect(content().string(containsString("aria-label=\"Acciones principales del cockpit\"")))
+                .andExpect(content().string(containsString("aria-label=\"Acciones principales del dashboard\"")))
                 .andExpect(content().string(containsString("<button type=\"button\"")))
                 .andExpect(content().string(containsString("Revisar abonos y cargos")));
     }
@@ -234,8 +235,8 @@ class CockpitStaticResourceTest {
         mockMvc.perform(get("/index.html"))
                 .andExpect(status().isOk())
                 .andExpect(content().string(containsString("Movimientos pendientes")))
-                .andExpect(content().string(containsString("Elige una categor")))
-                .andExpect(content().string(containsString("listo para proyecci")))
+                .andExpect(content().string(containsString("Elige categor")))
+                .andExpect(content().string(containsString("proyecta")))
                 .andExpect(content().string(containsString("Cargando movimientos pendientes")))
                 .andExpect(content().string(containsString("aria-label=\"Recomendaciones de caja\"")))
                 .andExpect(content().string(containsString("aria-label=\"Movimientos pendientes")));
@@ -266,11 +267,11 @@ class CockpitStaticResourceTest {
                 .andExpect(status().isOk())
                 .andExpect(content().string(containsString("aria-label=\"Proyecci")))
                 .andExpect(content().string(containsString("Saldo inicial manual, no bancario")))
-                .andExpect(content().string(containsString("ingresado por el usuario")))
+                .andExpect(content().string(containsString("Saldo manual, no bancario")))
                 .andExpect(content().string(containsString("value=\"7\"")))
                 .andExpect(content().string(containsString("value=\"30\"")))
                 .andExpect(content().string(containsString("data-api-target=\"projection-results\"")))
-                .andExpect(content().string(containsString("Categoriza movimientos para proyectar la caja")));
+                .andExpect(content().string(containsString("Categoriza movimientos para proyectar caja")));
     }
 
     @Test
@@ -314,9 +315,9 @@ class CockpitStaticResourceTest {
                 .andExpect(status().isOk())
                 .andExpect(content().string(containsString("<title>PymeFlow | Dashboard de caja</title>")))
                 .andExpect(content().string(containsString("<h1>Dashboard de caja</h1>")))
-                .andExpect(content().string(containsString(">Entradas</a>")))
-                .andExpect(content().string(containsString(">Salidas</a>")))
-                .andExpect(content().string(containsString(">Pendientes</a>")))
+                .andExpect(content().string(containsString("id=\"tab-revision\"")))
+                .andExpect(content().string(containsString("id=\"tab-proyeccion\"")))
+                .andExpect(content().string(containsString("id=\"tab-cartola\"")))
                 .andExpect(content().string(containsString("<p class=\"card-label\">Caja</p>")))
                 .andExpect(content().string(containsString("<p class=\"card-label\">Entradas</p>")))
                 .andExpect(content().string(containsString("<p class=\"card-label\">Salidas</p>")))
@@ -338,7 +339,7 @@ class CockpitStaticResourceTest {
                 .andExpect(status().isOk())
                 .andExpect(content().string(containsString("data-api-target=\"preferences-status\"")))
                 .andExpect(content().string(containsString("Saldo inicial manual, no bancario")))
-                .andExpect(content().string(containsString("No es saldo bancario en vivo ni saldo bancario real.")))
+                .andExpect(content().string(containsString("Saldo manual, no bancario.")))
                 .andExpect(content().string(not(containsString("saldo bancario disponible"))))
                 .andExpect(content().string(not(containsString("saldo bancario actualizado"))));
     }
@@ -370,7 +371,7 @@ class CockpitStaticResourceTest {
                 .andExpect(content().string(containsString("id=\"demo-reset-btn\"")))
                 .andExpect(content().string(containsString("Reiniciar demo")))
                 .andExpect(content().string(containsString("data-api-target=\"demo-reset-status\"")))
-                .andExpect(content().string(containsString("solo reinicia datos fixture/demo")))
+                .andExpect(content().string(containsString("Solo reinicia datos demo")))
                 .andExpect(content().string(not(containsString("conectividad bancaria real habilitada"))))
                 .andExpect(content().string(not(containsString("proveedor real conectado"))));
     }
@@ -415,10 +416,10 @@ class CockpitStaticResourceTest {
     void servesCockpitWithProminentDemoResetStatusContract() throws Exception {
         mockMvc.perform(get("/index.html"))
                 .andExpect(status().isOk())
-                .andExpect(content().string(containsString("class=\"state-line demo-reset-status\"")))
+                .andExpect(content().string(containsString("class=\"state-line status-text demo-reset-status\"")))
                 .andExpect(content().string(containsString("tabindex=\"-1\"")))
                 .andExpect(content().string(containsString("aria-live=\"polite\"")))
-                .andExpect(content().string(containsString("solo reinicia datos fixture/demo")));
+                .andExpect(content().string(containsString("Solo reinicia datos demo")));
 
         mockMvc.perform(get("/app.js"))
                 .andExpect(status().isOk())
@@ -438,7 +439,7 @@ class CockpitStaticResourceTest {
     void servesCockpitWithGuidedDemoStepsInRequiredOrderAndTargets() throws Exception {
         String html = mockMvc.perform(get("/index.html"))
                 .andExpect(status().isOk())
-                .andExpect(content().string(containsString("aria-label=\"Gu")))
+                .andExpect(content().string(containsString("aria-label=\"Ayuda demo")))
                 .andExpect(content().string(containsString("id=\"demo-guide\"")))
                 .andExpect(content().string(containsString("data-guide-step=\"reset\"")))
                 .andExpect(content().string(containsString("data-guide-step=\"review\"")))
@@ -462,9 +463,9 @@ class CockpitStaticResourceTest {
         mockMvc.perform(get("/index.html"))
                 .andExpect(status().isOk())
                 .andExpect(content().string(containsString("demo-guide-title")))
-                .andExpect(content().string(containsString("datos simulados")))
-                .andExpect(content().string(containsString("orienta la demo")))
-                .andExpect(content().string(containsString("No guarda avance")))
+                .andExpect(content().string(containsString("Datos simulados")))
+                .andExpect(content().string(containsString("bancaria")))
+                .andExpect(content().string(containsString("Avance visible")))
                 .andExpect(content().string(not(containsString("conectividad bancaria real habilitada"))))
                 .andExpect(content().string(not(containsString("proveedor real conectado"))))
                 .andExpect(content().string(not(containsString("bank-live"))))
@@ -502,7 +503,7 @@ class CockpitStaticResourceTest {
     void servesGuidedDemoWithAccessibleStatusAndNonBlockingControls() throws Exception {
         mockMvc.perform(get("/index.html"))
                 .andExpect(status().isOk())
-                .andExpect(content().string(containsString("<h2 id=\"demo-guide-title\">Gu")))
+                .andExpect(content().string(containsString("id=\"demo-guide-title\">Flujo demo")))
                 .andExpect(content().string(containsString("<ol class=\"guide-steps\"")))
                 .andExpect(content().string(containsString("aria-current=\"step\"")))
                 .andExpect(content().string(containsString("data-guide-status")))
