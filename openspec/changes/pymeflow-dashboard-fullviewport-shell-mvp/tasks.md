@@ -25,26 +25,26 @@ Chain strategy: stacked-to-main
 
 ## Phase 1: RED Contracts (PR1)
 
-- [ ] 1.1 Add failing assertions in `src/test/java/com/kuroneko/pymeflow/interfaces/web/CockpitStaticResourceTest.java` for `role="tablist"`, four tabs, `aria-controls`, `aria-selected`, and `role="tabpanel"` on `#revision`, `#proyeccion`, `#cartola`, `#comprobantes`.
-- [ ] 1.2 Add failing static tests in `CockpitStaticResourceTest.java` proving concise Spanish copy: no tutorial paragraphs, no real-bank/credential/provider/live-connectivity claims.
-- [ ] 1.3 Add failing tests that only one primary module is visible by default, theme switch remains a compact reusable control, and desktop/mobile CSS includes `100dvh` plus no horizontal-overflow guards.
-- [ ] 1.4 Add preservation tests for `data-api-target`, `data-action`, `data-guide-*`, `#demo-reset-btn`, `#opening-balance`, `[name="horizonDays"]`, API URLs, and `pymeflow.theme`.
+- [x] 1.1 Add failing assertions in `src/test/java/com/kuroneko/pymeflow/interfaces/web/CockpitStaticResourceTest.java` for `role="tablist"`, four tabs, `aria-controls`, `aria-selected`, and `role="tabpanel"` on `#revision`, `#proyeccion`, `#cartola`, `#comprobantes`.
+- [x] 1.2 Add failing static tests in `CockpitStaticResourceTest.java` proving concise Spanish copy: no tutorial paragraphs, no real-bank/credential/provider/live-connectivity claims.
+- [x] 1.3 Add failing tests that only one primary module is visible by default, theme switch remains a compact reusable control, and desktop/mobile CSS includes `100dvh` plus no horizontal-overflow guards.
+- [x] 1.4 Add preservation tests for `data-api-target`, `data-action`, `data-guide-*`, `#demo-reset-btn`, `#opening-balance`, `[name="horizonDays"]`, API URLs, and `pymeflow.theme`.
 
 ## Phase 2: GREEN Modular Shell (PR1)
 
-- [ ] 2.1 Refactor `src/main/resources/static/index.html` into topbar, KPI strip, accessible module tabs, one active workspace panel, and compact `Dashboard de caja` framing.
-- [ ] 2.2 Update `src/main/resources/static/styles.css` with fullviewport grid, compact KPI/tabs rhythm, internal panel scrolling, and 390px mobile no-overflow behavior.
-- [ ] 2.3 Add minimal selector-safe tab state in `src/main/resources/static/app.js`; do not change APIs, endpoint URLs, storage semantics, or existing action hooks.
+- [x] 2.1 Refactor `src/main/resources/static/index.html` into topbar, KPI strip, accessible module tabs, one active workspace panel, and compact `Dashboard de caja` framing.
+- [x] 2.2 Update `src/main/resources/static/styles.css` with fullviewport grid, compact KPI/tabs rhythm, internal panel scrolling, and 390px mobile no-overflow behavior.
+- [x] 2.3 Add minimal selector-safe tab state in `src/main/resources/static/app.js`; do not change APIs, endpoint URLs, storage semantics, or existing action hooks.
 
 ## Phase 3: PR1 Verification
 
-- [ ] 3.1 Run focused RED/GREEN evidence: `./gradlew.bat test --rerun-tasks --tests "*CockpitStaticResourceTest"`.
-- [ ] 3.2 Browser smoke 1366x768: topbar, KPIs, tabs, active module, review action area visible; page-level shell fits viewport.
-- [ ] 3.3 Browser smoke 390x844: tabs reachable, controls stack, keyboard order logical, and `scrollWidth <= clientWidth`.
-- [ ] 3.4 Remediate viewport smoke regressions with RED-first static contracts for bounded desktop shell, compact mobile ordering, internal evidence scrolling, and no horizontal overflow patterns.
+- [x] 3.1 Run focused RED/GREEN evidence: `./gradlew.bat test --rerun-tasks --tests "*CockpitStaticResourceTest"`.
+- [x] 3.2 Browser smoke 1366x768: topbar, KPIs, tabs, active module, review action area visible; page-level shell fits viewport.
+- [x] 3.3 Browser smoke 390x844: tabs reachable, controls stack, keyboard order logical, and `scrollWidth <= clientWidth`.
+- [x] 3.4 Remediate viewport smoke regressions with RED-first static contracts for bounded desktop shell, compact mobile ordering, internal evidence scrolling, and no horizontal overflow patterns.
 
-## Phase 4: PR2 Fullviewport Hardening
+## Phase 4: PR2 Detail Polish (if needed)
 
-- [ ] 4.1 Add RED tests for hidden/demoted tutorial treatment, bounded desktop shell, compact mobile shell ordering, internal evidence scrolling, and no horizontal-overflow patterns.
-- [ ] 4.2 Implement final viewport hardening in `styles.css` without touching backend/API contracts.
-- [ ] 4.3 Run focused static verification and preserve desktop/mobile smoke evidence before verify handoff.
+- [ ] 4.1 Add RED tests for `src/main/resources/static/index.html` drawer/dialog semantics: labelled title, close control, hidden inactive detail host, Escape/focus-return contract.
+- [ ] 4.2 Implement drawer/modal/detail polish in `index.html`, `styles.css`, and minimal `app.js` without touching backend/API contracts.
+- [ ] 4.3 Run `./gradlew.bat test --rerun-tasks` and repeat desktop/mobile browser smoke before verify handoff.

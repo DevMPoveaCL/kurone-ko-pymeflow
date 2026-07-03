@@ -28,7 +28,7 @@
         guide: {
             currentStep: "reset",
             completed: new Set(),
-            lastMessage: "No guarda avance: progreso visible solo en esta sesión del navegador.",
+            lastMessage: "Avance visible solo en esta sesión.",
         },
     };
 
@@ -52,6 +52,7 @@
 
     document.addEventListener("DOMContentLoaded", () => {
         setupThemePreference();
+        setupModuleTabs();
         renderGuideProgress();
         loadInitialData();
         $("#demo-guide")?.addEventListener("click", handleGuideClick);
@@ -81,6 +82,39 @@
         });
     }
 
+    function setupModuleTabs() {
+        const tabs = [...document.querySelectorAll('[role="tab"][aria-controls]')];
+        tabs.forEach((tab, index) => {
+            tab.addEventListener("click", () => activateModuleTab(tab));
+            tab.addEventListener("keydown", (event) => handleModuleTabKeydown(event, tabs, index));
+        });
+    }
+
+    function handleModuleTabKeydown(event, tabs, index) {
+        const nextKeys = ["ArrowRight", "ArrowDown"];
+        const previousKeys = ["ArrowLeft", "ArrowUp"];
+        if (![...nextKeys, ...previousKeys, "Home", "End"].includes(event.key)) return;
+        event.preventDefault();
+        const nextIndex = nextKeys.includes(event.key)
+                ? (index + 1) % tabs.length
+                : previousKeys.includes(event.key)
+                        ? (index - 1 + tabs.length) % tabs.length
+                        : event.key === "Home" ? 0 : tabs.length - 1;
+        activateModuleTab(tabs[nextIndex]);
+        tabs[nextIndex]?.focus();
+    }
+
+    function activateModuleTab(tab) {
+        if (!tab) return;
+        document.querySelectorAll('[role="tab"][aria-controls]').forEach((current) => {
+            const selected = current === tab;
+            current.setAttribute("aria-selected", String(selected));
+            current.tabIndex = selected ? 0 : -1;
+            const panel = document.getElementById(current.getAttribute("aria-controls"));
+            if (panel) panel.hidden = !selected;
+        });
+    }
+
     function resolveThemePreference() {
         return readStoredTheme() || preferredSystemTheme();
     }
@@ -104,7 +138,7 @@
         const dark = theme === "dark";
         toggle.setAttribute("aria-pressed", String(dark));
         toggle.setAttribute("aria-label", dark ? "Cambiar a tema claro" : "Cambiar a tema oscuro");
-        label.textContent = dark ? "Preferencia visual: Tema oscuro" : "Preferencia visual: Tema claro";
+        label.textContent = dark ? "Modo oscuro" : "Modo claro";
     }
 
     function safeLocalStorage(callback) {
@@ -126,12 +160,12 @@
 
     async function loadCockpitPreferences() {
         const status = target("preferences-status");
-        setState(status, "loading", "Cargando preferencias manuales del cockpit.");
+        setState(status, "loading", "Cargando preferencias manuales.");
         try {
             const preferences = await getJson(API.cockpitPreferences);
             prefillCockpitPreferences(preferences);
             state.preferencesLoaded = true;
-            setState(status, "success", "Preferencias manuales cargadas. El saldo no es bancario en vivo.");
+            setState(status, "success", "Preferencias manuales cargadas. Saldo manual, no bancario.");
         } catch (error) {
             state.preferencesLoaded = true;
             prefillCockpitPreferences({ preferredHorizonDays: 7 });
@@ -187,7 +221,7 @@
         } catch (error) {
             updateCashTotals([]);
             setState(ledger, "error", safeError(error, "No se pudo cargar el historial de caja."));
-            setState(target("manual-review-list"), "error", "No se pudo cargar revisión manual. El resto del cockpit sigue disponible.");
+            setState(target("manual-review-list"), "error", "No se pudo cargar revisión manual. El dashboard sigue disponible.");
         }
     }
 
@@ -237,7 +271,7 @@
                 preferredHorizonDays: state.projection.horizonDays,
             });
             prefillCockpitPreferences(saved);
-            setState(status, "success", "Preferencias guardadas. Saldo manual, no bancario en vivo.");
+            setState(status, "success", "Preferencias guardadas. Saldo manual, no bancario.");
         } catch (error) {
             setState(status, "error", safeError(error, "No se pudieron guardar las preferencias manuales."));
         }
@@ -256,7 +290,7 @@
 
     async function fetchProjection(openingBalance) {
         const results = target("projection-results");
-        setState(results, "loading", "Calculando proyección de caja con saldo inicial manual.");
+        setState(results, "loading", "Calculando proyección con saldo manual.");
         try {
             const params = new URLSearchParams({
                 profileId: PROFILE_ID,
@@ -277,7 +311,7 @@
         if (!dailyBalances.length) {
             const message = hasProjectableMovements()
                     ? "Hay movimientos listos, pero fuera del período seleccionado."
-                    : "Categoriza movimientos para proyectar la caja.";
+                    : "Categoriza movimientos para proyectar caja.";
             setState(results, "empty", message);
             markGuideStepComplete("project", "Proyección consultada con saldo manual. Guía completa para esta sesión demo.");
             return;
@@ -287,7 +321,7 @@
             <article class="projection-closing">
                 <span>Cierre proyectado</span>
                 <strong>${money.format(Number(projection.closingProjectedBalance || 0))}</strong>
-                <p>Calculado con saldo inicial manual ingresado por el usuario, no bancario en vivo.</p>
+                <p>Saldo manual, no bancario.</p>
             </article>
             <dl class="projection-totals">
                 <div><dt>abonos</dt><dd>${money.format(totals.inflows)}</dd></div>
@@ -363,7 +397,7 @@
         const button = $(`[data-action="provider-sync"]`);
         const receipt = target("sync-receipt");
         setBusy(button, true);
-        setState(receipt, "loading", "Ejecutando sync fixture/demo sin conectividad bancaria real.");
+        setState(receipt, "loading", "Ejecutando sync demo sin conexión bancaria.");
         try {
             const secretFreeRequest = {
                 profileId: PROFILE_ID,
@@ -387,16 +421,16 @@
         const button = $("#demo-reset-btn");
         const status = target("demo-reset-status");
         setBusy(button, true);
-        setState(status, "loading", "Reiniciando datos fixture/demo. No se consulta conectividad bancaria real.");
+        setState(status, "loading", "Reiniciando datos demo. Sin conexión bancaria.");
         try {
             const response = await postJson(API.demoReset);
             if (response.syncSessionId) {
                 await renderSyncStatus(response.syncSessionId);
             }
             await refreshCockpitEvidence();
-            setState(status, "success", "Demo reiniciada. Caja proyectada actualizada solo con movimientos listos para proyección.");
+            setState(status, "success", "Demo reiniciada. Caja actualizada con movimientos listos.");
             focusStatus(status);
-            markGuideStepComplete("reset", "Demo reiniciada con datos fixture/demo. Caja proyectada usa solo movimientos listos para proyección. Revisa pendientes separados antes de proyectar.");
+            markGuideStepComplete("reset", "Demo reiniciada. Revisa pendientes antes de proyectar.");
         } catch (error) {
             setState(status, "error", "No se pudo reiniciar la demo. Los datos visibles se mantienen.");
         } finally {
@@ -494,7 +528,7 @@
 
     function renderManualReviewMovement(movement) {
         const movementId = escapeHtml(movement.movementId);
-        const direction = movement.movementDirection === "DEBIT" ? "DEBIT · movimiento bancario" : "CREDIT · movimiento bancario";
+        const direction = movement.movementDirection === "DEBIT" ? "Salida" : "Entrada";
         const pill = movement.movementDirection === "DEBIT" ? "pill--debit" : "pill--credit";
         const label = escapeHtml(movement.description || "Movimiento pendiente");
         const reference = movement.sourceReference ? ` · Ref. ${escapeHtml(movement.sourceReference)}` : "";
@@ -503,7 +537,7 @@
             <div class="movement-main">
                 <strong>${label}</strong>
                 <span>${escapeHtml(movement.date || "Sin fecha")} · ${escapeHtml(movement.status || "MANUAL_REVIEW")}${reference}</span>
-                <span class="direction-note">Dirección bancaria: ${escapeHtml(movement.movementDirection || "Sin dirección")}. La categoría solo clasifica el flujo.</span>
+                <span class="direction-note">Dirección: ${escapeHtml(movement.movementDirection || "Sin dirección")}. Categoría separada.</span>
             </div>
             <span class="pill ${pill}">${direction}</span>
             <span class="money">${formatPositiveMoney(movement.amount)} ${movement.currency || "CLP"}</span>
@@ -588,6 +622,8 @@
         const destination = $(link.dataset.guideTarget);
         if (!destination) return;
         event.preventDefault();
+        const tab = $(`[role="tab"][aria-controls="${destination.id}"]`);
+        if (tab) activateModuleTab(tab);
         destination.scrollIntoView({ behavior: "smooth", block: "start" });
         destination.focus({ preventScroll: true });
     }
@@ -619,8 +655,8 @@
 
     function nextGuideMessage() {
         const current = GUIDE_STEPS.find((step) => step.key === state.guide.currentStep);
-        if (!current?.next) return "Guía actualizada: la secuencia demo quedó completa en esta sesión.";
-        return `Guía actualizada: sigue con ${current.next}. Avance solo visible en esta sesión demo.`;
+        if (!current?.next) return "Demo completa en esta sesión.";
+        return `Sigue con ${current.next}. Avance solo visible en esta sesión.`;
     }
 
     function renderRecommendation(signal) {

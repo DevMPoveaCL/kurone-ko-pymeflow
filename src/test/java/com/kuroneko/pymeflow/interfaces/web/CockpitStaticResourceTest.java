@@ -290,7 +290,7 @@ class CockpitStaticResourceTest {
                 .andExpect(content().string(containsString("obligaciones")))
                 .andExpect(content().string(containsString("Ingresa un saldo inicial manual para proyectar caja.")))
                 .andExpect(content().string(containsString("Hay movimientos listos")))
-                .andExpect(content().string(containsString("Categoriza movimientos para proyectar la caja.")))
+                .andExpect(content().string(containsString("Categoriza movimientos para proyectar caja.")))
                 .andExpect(content().string(containsString("No se pudo cargar la proyecci")))
                 .andExpect(content().string(not(containsString("bank-live"))));
     }
@@ -304,7 +304,7 @@ class CockpitStaticResourceTest {
                 .andExpect(content().string(containsString("chooseProjectionStartDate(state.projection.projectableMovementDates, state.projection.horizonDays)")))
                 .andExpect(content().string(containsString("hasProjectableMovements()")))
                 .andExpect(content().string(containsString("Hay movimientos listos")))
-                .andExpect(content().string(containsString("Categoriza movimientos para proyectar la caja.")))
+                .andExpect(content().string(containsString("Categoriza movimientos para proyectar caja.")))
                 .andExpect(content().string(not(containsString("startDate: todayIsoDate()"))))
                 .andExpect(content().string(not(containsString("Categoriza movimientos primero para proyectar caja."))));
     }
@@ -331,6 +331,202 @@ class CockpitStaticResourceTest {
                 .andExpect(content().string(containsString("font-size: clamp(1.45rem, 3vw, 2.2rem)")))
                 .andExpect(content().string(not(containsString("font-size: clamp(2rem, 5vw, 4rem)"))))
                 .andExpect(content().string(not(containsString("font-size: clamp(1.4rem, 3vw, 2.25rem)"))));
+    }
+
+    @Test
+    void servesDashboardCajaAsPrimaryUserFacingShellWithoutCockpitFraming() throws Exception {
+        String html = mockMvc.perform(get("/index.html"))
+                .andExpect(status().isOk())
+                .andReturn()
+                .getResponse()
+                .getContentAsString();
+
+        assertThat(html).contains("<title>PymeFlow | Dashboard de caja</title>");
+        assertThat(html).contains("aria-label=\"Dashboard de caja\"");
+        assertThat(html).contains("<h1>Dashboard de caja</h1>");
+        assertThat(html).contains("<main id=\"contenido\" class=\"dashboard-shell\" tabindex=\"-1\">");
+        assertThat(html).doesNotContain("MVP cockpit");
+        assertThat(html).doesNotContain("Secciones del cockpit");
+        assertThat(html).doesNotContain("Acciones principales del cockpit");
+    }
+
+    @Test
+    void servesDashboardWithFullviewportPrimaryShellContracts() throws Exception {
+        String html = mockMvc.perform(get("/index.html"))
+                .andExpect(status().isOk())
+                .andReturn()
+                .getResponse()
+                .getContentAsString();
+
+        assertThat(html).contains("class=\"shell-metrics");
+        assertThat(html).contains("class=\"module-tabs quick-nav\"");
+        assertThat(html).contains("class=\"module-workspace\"");
+        assertThat(html).contains("class=\"module-panel shell-review review-panel\"");
+        assertThat(html.indexOf("class=\"shell-metrics")).isLessThan(html.indexOf("class=\"primary-shell"));
+        assertThat(html.indexOf("role=\"tablist\"")).isLessThan(html.indexOf("id=\"revision"));
+        assertThat(html.indexOf("id=\"revision\"")).isLessThan(html.indexOf("id=\"cartola\""));
+        assertThat(html.indexOf("id=\"revision\"")).isLessThan(html.indexOf("id=\"comprobantes\""));
+    }
+
+    @Test
+    void servesDashboardStylesWithFullviewportAndMobileNoOverflowGuards() throws Exception {
+        String css = mockMvc.perform(get("/styles.css"))
+                .andExpect(status().isOk())
+                .andReturn()
+                .getResponse()
+                .getContentAsString();
+
+        assertThat(css).contains("min-height: 100dvh");
+        assertThat(css).contains("grid-template-rows: auto auto minmax(0, 1fr)");
+        assertThat(css).contains(".primary-shell");
+        assertThat(css).contains(".module-workspace");
+        assertThat(css).contains(".module-panel[hidden] { display: none; }");
+        assertThat(css).contains("overflow: hidden");
+        assertThat(css).contains("min-width: 0");
+        assertThat(css).contains("max-width: 100%");
+        assertThat(css).contains("@media (max-width: 700px)");
+        assertThat(css).contains("grid-template-columns: minmax(0, 1fr)");
+        assertThat(css).doesNotContain("width: 100vw");
+    }
+
+    @Test
+    void servesDashboardWithConcisePrimaryCopyAndSecondaryEvidenceBelowFold() throws Exception {
+        String html = mockMvc.perform(get("/index.html"))
+                .andExpect(status().isOk())
+                .andReturn()
+                .getResponse()
+                .getContentAsString();
+
+        assertThat(html).contains("Datos demo/manuales");
+        assertThat(html).contains("Saldo manual");
+        assertThat(html).contains("Movimientos listos");
+        assertThat(html).contains("class=\"module-workspace");
+        assertThat(html.indexOf("class=\"shell-metrics")).isLessThan(html.indexOf("class=\"primary-shell"));
+        assertThat(html).doesNotContain("Una vista operativa para revisar abonos, cargos, cartola");
+        assertThat(html).doesNotContain("conectividad bancaria real habilitada");
+        assertThat(html).doesNotContain("credenciales bancarias");
+        assertThat(html).doesNotContain("proveedor real conectado");
+        assertThat(html).doesNotContain("banca en vivo");
+    }
+
+    @Test
+    void servesDashboardWithSystemicConciseControlCopyAndReusableCompactPatterns() throws Exception {
+        String html = mockMvc.perform(get("/index.html"))
+                .andExpect(status().isOk())
+                .andReturn()
+                .getResponse()
+                .getContentAsString();
+
+        assertThat(html).contains("<span data-theme-toggle-label>Modo claro</span>");
+        assertThat(html).contains("class=\"compact-control theme-toggle\"");
+        assertThat(html).contains("class=\"help-text\"");
+        assertThat(html).contains("class=\"state-line status-text demo-reset-status\"");
+        assertThat(html).contains("<h2>Pendientes</h2>");
+        assertThat(html).contains("<h2>Comprobantes</h2>");
+        assertThat(html).doesNotContain("Preferencia visual");
+        assertThat(html).doesNotContain("No afecta datos ni avance demo");
+        assertThat(html).doesNotContain("La guía orienta la demo");
+        assertThat(html).doesNotContain("clasifica cada movimiento sin mezclar dirección y categoría");
+
+        String css = mockMvc.perform(get("/styles.css"))
+                .andExpect(status().isOk())
+                .andReturn()
+                .getResponse()
+                .getContentAsString();
+
+        assertThat(css).contains(".compact-control");
+        assertThat(css).contains(".help-text");
+        assertThat(css).contains(".status-text");
+        assertThat(css).doesNotContain(".theme-toggle small");
+    }
+
+    @Test
+    void servesDashboardWithAccessibleModuleTabsAndPanels() throws Exception {
+        String html = mockMvc.perform(get("/index.html"))
+                .andExpect(status().isOk())
+                .andReturn()
+                .getResponse()
+                .getContentAsString();
+
+        assertThat(html).contains("role=\"tablist\"");
+        assertThat(html).contains("aria-label=\"").contains("dashboard");
+        assertThat(html).contains("id=\"tab-revision\"");
+        assertThat(html).contains("id=\"tab-proyeccion\"");
+        assertThat(html).contains("id=\"tab-cartola\"");
+        assertThat(html).contains("id=\"tab-comprobantes\"");
+        assertThat(html).contains("aria-controls=\"revision\"");
+        assertThat(html).contains("aria-controls=\"proyeccion\"");
+        assertThat(html).contains("aria-controls=\"cartola\"");
+        assertThat(html).contains("aria-controls=\"comprobantes\"");
+        assertThat(html).contains("Revisi");
+        assertThat(html).contains("Proyecci");
+        assertThat(html).contains(">Cartola</button>");
+        assertThat(html).contains(">Comprobantes</button>");
+        assertThat(html).contains("id=\"revision\"");
+        assertThat(html).contains("class=\"module-panel shell-review review-panel\"");
+        assertThat(html).contains("role=\"tabpanel\" aria-labelledby=\"tab-revision\"");
+        assertThat(html).contains("id=\"proyeccion\"");
+        assertThat(html).contains("class=\"module-panel shell-projection projection-panel\"");
+        assertThat(html).contains("role=\"tabpanel\" aria-labelledby=\"tab-proyeccion\"");
+        assertThat(html).contains("id=\"cartola\" class=\"module-panel ledger-panel\" role=\"tabpanel\" aria-labelledby=\"tab-cartola\"");
+        assertThat(html).contains("id=\"comprobantes\" class=\"module-panel receipt-rail\" role=\"tabpanel\" aria-labelledby=\"tab-comprobantes\"");
+    }
+
+    @Test
+    void servesDashboardWithOneVisiblePrimaryModuleAndNoTutorialShellCopy() throws Exception {
+        String html = mockMvc.perform(get("/index.html"))
+                .andExpect(status().isOk())
+                .andReturn()
+                .getResponse()
+                .getContentAsString();
+
+        assertThat(html).contains("id=\"tab-revision\"");
+        assertThat(html).contains("role=\"tab\" aria-selected=\"true\" aria-controls=\"revision\"");
+        assertThat(html).contains("id=\"tab-proyeccion\"");
+        assertThat(html).contains("role=\"tab\" aria-selected=\"false\" aria-controls=\"proyeccion\" tabindex=\"-1\"");
+        assertThat(html).contains("id=\"tab-cartola\"");
+        assertThat(html).contains("role=\"tab\" aria-selected=\"false\" aria-controls=\"cartola\" tabindex=\"-1\"");
+        assertThat(html).contains("id=\"tab-comprobantes\"");
+        assertThat(html).contains("role=\"tab\" aria-selected=\"false\" aria-controls=\"comprobantes\" tabindex=\"-1\"");
+        assertThat(html).contains("id=\"proyeccion\" class=\"module-panel shell-projection projection-panel\" role=\"tabpanel\" aria-labelledby=\"tab-proyeccion\" tabindex=\"-1\" hidden");
+        assertThat(html).contains("id=\"cartola\" class=\"module-panel ledger-panel\" role=\"tabpanel\" aria-labelledby=\"tab-cartola\" tabindex=\"-1\" hidden");
+        assertThat(html).contains("id=\"comprobantes\" class=\"module-panel receipt-rail\" role=\"tabpanel\" aria-labelledby=\"tab-comprobantes\" tabindex=\"-1\" hidden");
+        assertThat(html).doesNotContain("La guía orienta la demo");
+        assertThat(html).doesNotContain("Observa cómo se pobla");
+        assertThat(html).doesNotContain("Aprende el flujo completo");
+    }
+
+    @Test
+    void servesDashboardStylesAndScriptWithModularFullviewportContracts() throws Exception {
+        String css = mockMvc.perform(get("/styles.css"))
+                .andExpect(status().isOk())
+                .andReturn()
+                .getResponse()
+                .getContentAsString();
+
+        assertThat(css).contains(".module-tabs");
+        assertThat(css).contains(".module-workspace");
+        assertThat(css).contains(".module-panel[hidden] { display: none; }");
+        assertThat(css).contains("grid-template-rows: auto auto minmax(0, 1fr)");
+        assertThat(css).contains("overflow: hidden");
+        assertThat(css).contains("overflow-x: auto");
+        assertThat(css).contains("min-height: 100dvh");
+        assertThat(css).contains("@media (max-width: 520px)");
+
+        String script = mockMvc.perform(get("/app.js"))
+                .andExpect(status().isOk())
+                .andReturn()
+                .getResponse()
+                .getContentAsString();
+
+        assertThat(script).contains("setupModuleTabs");
+        assertThat(script).contains("[role=\"tab\"][aria-controls]");
+        assertThat(script).contains("aria-selected");
+        assertThat(script).contains("panel.hidden");
+        assertThat(script).contains("activateModuleTab");
+        assertThat(script).contains("ArrowRight");
+        assertThat(script).contains("ArrowLeft");
+        assertThat(script).contains("pymeflow.theme");
     }
 
     @Test
@@ -383,7 +579,7 @@ class CockpitStaticResourceTest {
                 .andExpect(content().string(containsString("demoReset: `/api/cockpit/demo/reset-and-seed?profileId=${PROFILE_ID}`")))
                 .andExpect(content().string(containsString("#demo-reset-btn")))
                 .andExpect(content().string(containsString("runDemoReset")))
-                .andExpect(content().string(containsString("Reiniciando datos fixture/demo")))
+                .andExpect(content().string(containsString("Reiniciando datos demo")))
                 .andExpect(content().string(containsString("Demo reiniciada")))
                 .andExpect(content().string(containsString("No se pudo reiniciar la demo. Los datos visibles se mantienen.")))
                 .andExpect(content().string(containsString("loadCockpitPreferences()")))
@@ -408,7 +604,7 @@ class CockpitStaticResourceTest {
         assertThat(script).contains("const movements = [...projectionReady, ...manualReview]");
         assertThat(script).contains("renderLedger(movements)");
         assertThat(script).contains("renderManualReview(manualReview)");
-        assertThat(script).contains("Caja proyectada usa solo movimientos listos");
+        assertThat(script).contains("Caja actualizada con movimientos listos");
         assertThat(script).doesNotContain("            updateCashTotals(movements);");
     }
 
@@ -423,10 +619,10 @@ class CockpitStaticResourceTest {
 
         mockMvc.perform(get("/app.js"))
                 .andExpect(status().isOk())
-                .andExpect(content().string(containsString("Caja proyectada actualizada solo con movimientos listos")))
+                .andExpect(content().string(containsString("Caja actualizada con movimientos listos")))
                 .andExpect(content().string(containsString("focusStatus(status)")))
                 .andExpect(content().string(containsString("scrollIntoView({ behavior: \"smooth\", block: \"center\" })")))
-                .andExpect(content().string(containsString("Demo reiniciada con datos fixture/demo. Caja proyectada usa solo movimientos listos")));
+                .andExpect(content().string(containsString("Demo reiniciada. Revisa pendientes antes de proyectar")));
 
         mockMvc.perform(get("/styles.css"))
                 .andExpect(status().isOk())
