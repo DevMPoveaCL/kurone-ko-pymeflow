@@ -77,8 +77,8 @@ public class CockpitDemoResetService {
                 projectable(profileId, BigDecimal.valueOf(185_000), LocalDate.of(2026, 6, 20), TransactionDirection.CREDIT, "sales", "Demo sales batch", "demo-reset-sales-001"),
                 projectable(profileId, BigDecimal.valueOf(240_000), LocalDate.of(2026, 6, 21), TransactionDirection.CREDIT, ACQUIRER_SETTLEMENTS, "Demo card settlement", ACQUIRER_SOURCE_REFERENCE),
                 projectable(profileId, BigDecimal.valueOf(120_000), LocalDate.of(2026, 6, 22), TransactionDirection.DEBIT, "suppliers", "Demo supplier payment", "demo-reset-suppliers-001"),
-                manualReview(profileId, BigDecimal.valueOf(900_000), LocalDate.of(2026, 6, 23), "Demo rent payment", "demo-reset-rent-001"),
-                manualReview(profileId, BigDecimal.valueOf(250_000), LocalDate.of(2026, 6, 24), "Demo utilities payment", "demo-reset-utilities-001")
+                manualReview(profileId, BigDecimal.valueOf(900_000), LocalDate.of(2026, 6, 23), TransactionDirection.DEBIT, "Demo rent payment", "demo-reset-rent-001"),
+                manualReview(profileId, BigDecimal.valueOf(250_000), LocalDate.of(2026, 6, 24), TransactionDirection.CREDIT, "Demo marketplace settlement", "demo-reset-marketplace-001")
         );
     }
 
@@ -109,6 +109,7 @@ public class CockpitDemoResetService {
             ProfileId profileId,
             BigDecimal amount,
             LocalDate date,
+            TransactionDirection direction,
             String safeDescription,
             String sourceReference
     ) {
@@ -117,7 +118,7 @@ public class CockpitDemoResetService {
                 amount,
                 CLP,
                 date,
-                TransactionDirection.DEBIT,
+                direction,
                 CashflowMovementStatus.MANUAL_REVIEW,
                 null,
                 safeDescription,

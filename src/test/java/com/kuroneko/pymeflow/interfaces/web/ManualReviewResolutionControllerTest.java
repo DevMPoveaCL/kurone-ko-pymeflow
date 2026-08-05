@@ -237,6 +237,21 @@ class ManualReviewResolutionControllerTest {
     }
 
     @Test
+    void mapsPersistedCategoryDirectionMismatchToClearSpanishError() throws Exception {
+        var movementId = UUID.randomUUID();
+        var message = "La categoría seleccionada no es compatible: su dirección no coincide con la del movimiento bancario y no puede convertir una entrada en una salida o viceversa.";
+        when(cashflowMovementHistoryService.resolveManualReview(any()))
+                .thenThrow(new IllegalArgumentException(message));
+
+        mockMvc.perform(post("/api/cashflow/manual-review/resolutions/{movementId}", movementId)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(persistedPayload()))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("BAD_REQUEST"))
+                .andExpect(jsonPath("$.message").value(message));
+    }
+
+    @Test
     void rejectsSensitivePersistedResolutionInputWithoutEchoingRequestText() throws Exception {
         var sensitiveDescription = "Venta Caja 1 receta 12345";
         when(cashflowMovementHistoryService.resolveManualReview(any()))

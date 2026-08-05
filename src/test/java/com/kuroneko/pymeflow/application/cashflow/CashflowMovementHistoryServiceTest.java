@@ -105,9 +105,86 @@ class CashflowMovementHistoryServiceTest {
         assertThat(result.transaction().status()).isEqualTo(CashflowMovementStatus.PROJECTABLE);
         assertThat(result.transaction().categoryKey()).isEqualTo("sales");
         assertThat(result.category().key()).isEqualTo("sales");
+        assertThat(result.transaction().amount()).isEqualByComparingTo(movement.amount());
+        assertThat(result.transaction().direction()).isEqualTo(TransactionDirection.CREDIT);
+        assertThat(result.category().direction()).isEqualTo(CashflowDirection.INFLOW);
         assertThat(result.safeDescription()).contains("Venta Caja 1");
         assertThat(result.safeSourceReference()).contains("caja-1");
-        assertThat(port.findProjectionReady(PROFILE_ID)).extracting(CashflowMovementRecord::id).contains(movement.id());
+        assertThat(port.findProjectionReady(PROFILE_ID))
+                .singleElement()
+                .satisfies(resolved -> {
+                    assertThat(resolved.id()).isEqualTo(movement.id());
+                    assertThat(resolved.amount()).isEqualByComparingTo(movement.amount());
+                    assertThat(resolved.direction()).isEqualTo(TransactionDirection.CREDIT);
+                });
+    }
+
+    @Test
+    void rejectsIncompatibleCategoryDirectionBeforePersistingResolution() {
+        var movement = movement(
+                CashflowMovementStatus.MANUAL_REVIEW,
+                null,
+                "Pago proveedor",
+                "proveedor-1",
+                LocalDate.of(2026, 6, 1),
+                TransactionDirection.DEBIT
+        );
+        var port = new FakeHistoryPort(List.of(movement));
+
+        assertThatThrownBy(() -> service(port).resolveManualReview(new ManualReviewMovementResolutionCommand(
+                movement.id(), PROFILE_ID, "sales")))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessage("La categoría seleccionada no es compatible: su dirección no coincide con la del movimiento bancario y no puede convertir una entrada en una salida o viceversa.");
+
+        var unchanged = port.findById(movement.id()).orElseThrow();
+        assertThat(unchanged.status()).isEqualTo(CashflowMovementStatus.MANUAL_REVIEW);
+        assertThat(unchanged.amount()).isEqualByComparingTo(movement.amount());
+        assertThat(unchanged.direction()).isEqualTo(TransactionDirection.DEBIT);
+    }
+
+    @Test
+    void rejectsCreditMovementWithOutflowCategoryBeforePersistingResolution() {
+        var movement = movement(
+                CashflowMovementStatus.MANUAL_REVIEW,
+                null,
+                "Venta cliente",
+                "cliente-1",
+                LocalDate.of(2026, 6, 1),
+                TransactionDirection.CREDIT
+        );
+        var port = new FakeHistoryPort(List.of(movement));
+
+        assertThatThrownBy(() -> service(port).resolveManualReview(new ManualReviewMovementResolutionCommand(
+                movement.id(), PROFILE_ID, "supplies")))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessage("La categoría seleccionada no es compatible: su dirección no coincide con la del movimiento bancario y no puede convertir una entrada en una salida o viceversa.");
+
+        var unchanged = port.findById(movement.id()).orElseThrow();
+        assertThat(unchanged.status()).isEqualTo(CashflowMovementStatus.MANUAL_REVIEW);
+        assertThat(unchanged.amount()).isEqualByComparingTo(movement.amount());
+        assertThat(unchanged.direction()).isEqualTo(TransactionDirection.CREDIT);
+    }
+
+    @Test
+    void preservesDebitAmountSignAndDirectionWhenCategoryIsCompatible() {
+        var movement = movement(
+                CashflowMovementStatus.MANUAL_REVIEW,
+                null,
+                "Pago proveedor",
+                "proveedor-1",
+                LocalDate.of(2026, 6, 1),
+                TransactionDirection.DEBIT
+        );
+        var port = new FakeHistoryPort(List.of(movement));
+
+        var result = service(port).resolveManualReview(new ManualReviewMovementResolutionCommand(
+                movement.id(), PROFILE_ID, "supplies"));
+
+        assertThat(result.transaction().amount()).isEqualByComparingTo(movement.amount());
+        assertThat(result.transaction().direction()).isEqualTo(TransactionDirection.DEBIT);
+        assertThat(result.category().direction()).isEqualTo(CashflowDirection.OUTFLOW);
+        assertThat(port.findById(movement.id()).orElseThrow().amount()).isEqualByComparingTo(movement.amount());
+        assertThat(port.findById(movement.id()).orElseThrow().direction()).isEqualTo(TransactionDirection.DEBIT);
     }
 
     @Test
@@ -195,13 +272,25 @@ class CashflowMovementHistoryServiceTest {
             String sourceReference,
             LocalDate date
     ) {
+        return movement(status, categoryKey, safeDescription, sourceReference, date,
+                status == CashflowMovementStatus.PROJECTABLE ? TransactionDirection.DEBIT : TransactionDirection.CREDIT);
+    }
+
+    private static CashflowMovementRecord movement(
+            CashflowMovementStatus status,
+            String categoryKey,
+            String safeDescription,
+            String sourceReference,
+            LocalDate date,
+            TransactionDirection direction
+    ) {
         return new CashflowMovementRecord(
                 UUID.randomUUID(),
                 PROFILE_ID,
                 BigDecimal.valueOf(10_000),
                 CLP,
                 date,
-                status == CashflowMovementStatus.PROJECTABLE ? TransactionDirection.DEBIT : TransactionDirection.CREDIT,
+                direction,
                 status,
                 categoryKey,
                 safeDescription,
@@ -218,7 +307,10 @@ class CashflowMovementHistoryServiceTest {
                 PROFILE_ID,
                 "Retail",
                 List.of(),
-                List.of(new CashflowCategory("sales", "Sales", CashflowDirection.INFLOW)),
+                List.of(
+                        new CashflowCategory("sales", "Sales", CashflowDirection.INFLOW),
+                        new CashflowCategory("supplies", "Supplies", CashflowDirection.OUTFLOW)
+                ),
                 List.of()
         );
     }

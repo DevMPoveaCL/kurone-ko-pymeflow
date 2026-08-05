@@ -65,7 +65,15 @@ class CashflowProjectionControllerTest {
                         "healthy-status",
                         "projected_balance_above_threshold",
                         LocalDate.of(2026, 2, 1),
-                        BigDecimal.valueOf(1625000)
+                        BigDecimal.valueOf(1625000),
+                        BigDecimal.valueOf(750000)
+                ), new ProjectionAlert(
+                        "low-status",
+                        "warn-low",
+                        "projected_balance_below_threshold",
+                        LocalDate.of(2026, 2, 1),
+                        BigDecimal.valueOf(1625000),
+                        BigDecimal.valueOf(250000)
                 ))
         ));
 
@@ -77,7 +85,10 @@ class CashflowProjectionControllerTest {
                 .andExpect(jsonPath("$.dailyBalances[0].balance").value(1625000))
                 .andExpect(jsonPath("$.closingProjectedBalance").value(1625000))
                 .andExpect(jsonPath("$.appliedObligations[0].obligationKey").value("rent"))
-                .andExpect(jsonPath("$.alerts[0].ruleKey").value("healthy-status"));
+                .andExpect(jsonPath("$.alerts[0].ruleKey").value("healthy-status"))
+                .andExpect(jsonPath("$.alerts[0].threshold").value(750000))
+                .andExpect(jsonPath("$.alerts[1].ruleKey").value("low-status"))
+                .andExpect(jsonPath("$.alerts[1].threshold").value(250000));
     }
 
     @Test
@@ -227,7 +238,7 @@ class CashflowProjectionControllerTest {
                         )),
                         BigDecimal.valueOf(150_000),
                         List.of(),
-                        List.of(new ProjectionAlert("healthy", "continue", "projected_balance_above_threshold", LocalDate.of(2026, 6, 1), BigDecimal.valueOf(150_000)))
+                        List.of(new ProjectionAlert("healthy", "continue", "projected_balance_above_threshold", LocalDate.of(2026, 6, 1), BigDecimal.valueOf(150_000), BigDecimal.valueOf(125_000)))
                 ));
 
         mockMvc.perform(get("/api/cashflow/cockpit/projection")
@@ -239,7 +250,8 @@ class CashflowProjectionControllerTest {
                 .andExpect(jsonPath("$.dailyBalances[0].date").value("2026-06-01"))
                 .andExpect(jsonPath("$.dailyBalances[0].inflows").value(50000))
                 .andExpect(jsonPath("$.closingProjectedBalance").value(150000))
-                .andExpect(jsonPath("$.alerts[0].ruleKey").value("healthy"));
+                .andExpect(jsonPath("$.alerts[0].ruleKey").value("healthy"))
+                .andExpect(jsonPath("$.alerts[0].threshold").value(125000));
     }
 
     @Test

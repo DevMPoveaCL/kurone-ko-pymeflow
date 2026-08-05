@@ -246,7 +246,8 @@ public class CashflowProjectionController {
             String actionKey,
             String condition,
             LocalDate date,
-            BigDecimal balance
+            BigDecimal balance,
+            BigDecimal threshold
     ) {
         static ProjectionAlertResponse from(ProjectionAlert alert) {
             return new ProjectionAlertResponse(
@@ -254,7 +255,8 @@ public class CashflowProjectionController {
                     alert.actionKey(),
                     alert.condition(),
                     alert.date(),
-                    alert.balance()
+                    alert.balance(),
+                    alert.threshold()
             );
         }
     }

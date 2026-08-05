@@ -5,6 +5,12 @@ build/
 *.tmp
 !.gradle/wrapper/gradle-wrapper.properties
 
+# Local QA screenshots and image exports in the repository root
+/*.png
+/*.jpg
+/*.jpeg
+/*.webp
+
 # Local environment / secrets
 .env
 .env.*
@@ -15,14 +21,21 @@ build/
 .idea/
 .vscode/
 *.iml
+.classpath
+.project
+.settings/
+.factorypath
 .DS_Store
 Thumbs.db
 
 # Local AI/tooling artifacts
 .atl/
 .playwright-mcp/
+.codegraph/
 
 # Runtime data
 logs/
 tmp/
 *.pid
+hs_err_pid*.log
+replay_pid*.log

@@ -82,13 +82,29 @@ class CockpitDemoResetServiceTest {
                 );
         assertThat(movements).extracting(CashflowMovementDraft::categoryKey)
                 .containsExactly("sales", "acquirer-settlements", "suppliers", null, null);
+        assertThat(movements).extracting(CashflowMovementDraft::amount)
+                .containsExactly(
+                        BigDecimal.valueOf(185_000),
+                        BigDecimal.valueOf(240_000),
+                        BigDecimal.valueOf(120_000),
+                        BigDecimal.valueOf(900_000),
+                        BigDecimal.valueOf(250_000)
+                );
+        assertThat(movements).extracting(CashflowMovementDraft::safeDescription)
+                .containsExactly(
+                        "Demo sales batch",
+                        "Demo card settlement",
+                        "Demo supplier payment",
+                        "Demo rent payment",
+                        "Demo marketplace settlement"
+                );
         assertThat(movements).extracting(CashflowMovementDraft::direction)
                 .containsExactly(
                         TransactionDirection.CREDIT,
                         TransactionDirection.CREDIT,
                         TransactionDirection.DEBIT,
                         TransactionDirection.DEBIT,
-                        TransactionDirection.DEBIT
+                        TransactionDirection.CREDIT
                 );
         assertThat(movements).extracting(CashflowMovementDraft::sourceReference)
                 .containsExactly(
@@ -96,8 +112,47 @@ class CockpitDemoResetServiceTest {
                         "demo-reset-acquirer-001",
                         "demo-reset-suppliers-001",
                         "demo-reset-rent-001",
-                        "demo-reset-utilities-001"
+                        "demo-reset-marketplace-001"
                 );
+        assertThat(movements).filteredOn(movement -> movement.status() == CashflowMovementStatus.PROJECTABLE)
+                .hasSize(3);
+        assertThat(movements).filteredOn(movement -> movement.status() == CashflowMovementStatus.MANUAL_REVIEW)
+                .hasSize(2);
+        assertThat(movements)
+                .filteredOn(movement -> movement.status() == CashflowMovementStatus.MANUAL_REVIEW)
+                .filteredOn(movement -> movement.direction() == TransactionDirection.CREDIT)
+                .hasSize(1);
+        assertThat(movements)
+                .filteredOn(movement -> movement.status() == CashflowMovementStatus.MANUAL_REVIEW)
+                .filteredOn(movement -> movement.direction() == TransactionDirection.DEBIT)
+                .hasSize(1);
+        assertThat(movements).filteredOn(movement -> movement.direction() == TransactionDirection.CREDIT)
+                .hasSize(3);
+        assertThat(movements).filteredOn(movement -> movement.direction() == TransactionDirection.DEBIT)
+                .hasSize(2);
+
+        assertThat(movements.stream()
+                .filter(movement -> movement.status() == CashflowMovementStatus.PROJECTABLE)
+                .filter(movement -> movement.direction() == TransactionDirection.CREDIT)
+                .map(CashflowMovementDraft::amount)
+                .reduce(BigDecimal.ZERO, BigDecimal::add))
+                .isEqualByComparingTo("425000");
+        assertThat(movements.stream()
+                .filter(movement -> movement.status() == CashflowMovementStatus.PROJECTABLE)
+                .filter(movement -> movement.direction() == TransactionDirection.DEBIT)
+                .map(CashflowMovementDraft::amount)
+                .reduce(BigDecimal.ZERO, BigDecimal::add))
+                .isEqualByComparingTo("120000");
+        assertThat(movements.stream()
+                .filter(movement -> movement.direction() == TransactionDirection.CREDIT)
+                .map(CashflowMovementDraft::amount)
+                .reduce(BigDecimal.ZERO, BigDecimal::add))
+                .isEqualByComparingTo("675000");
+        assertThat(movements.stream()
+                .filter(movement -> movement.direction() == TransactionDirection.DEBIT)
+                .map(CashflowMovementDraft::amount)
+                .reduce(BigDecimal.ZERO, BigDecimal::add))
+                .isEqualByComparingTo("1020000");
     }
 
     @Test

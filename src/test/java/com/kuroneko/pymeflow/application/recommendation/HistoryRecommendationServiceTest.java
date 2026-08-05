@@ -165,7 +165,13 @@ class HistoryRecommendationServiceTest {
         var emptyResponse = service(new FakeCashflowMovementHistoryPort()).generate(PROFILE_ID);
 
         assertThat(signalTypes(emptyResponse)).containsExactly("INSUFFICIENT_DATA");
-        assertThat(signal(emptyResponse, "INSUFFICIENT_DATA").metrics()).containsEntry("projectableCount", 0);
+        var emptySignal = signal(emptyResponse, "INSUFFICIENT_DATA");
+        assertThat(emptySignal.severity()).isEqualTo("INFO");
+        assertThat(emptySignal.title()).isEqualTo("Señal en formación");
+        assertThat(emptySignal.description()).isEqualTo("Hay 0 de 10 movimientos listos para proyección. La proyección ya funciona; las recomendaciones serán más robustas al alcanzar el mínimo.");
+        assertThat(emptySignal.actionHint()).isEqualTo("Sigue incorporando movimientos reales para fortalecer las señales.");
+        assertThat(emptySignal.metrics()).containsEntry("projectableCount", 0)
+                .containsEntry("minimumProjectableCount", 10);
 
         var noProjectableResponse = service(new FakeCashflowMovementHistoryPort()
                 .withManualReviews(2)
@@ -174,6 +180,13 @@ class HistoryRecommendationServiceTest {
 
         assertThat(signalTypes(noProjectableResponse)).contains("INSUFFICIENT_DATA");
         assertThat(signal(noProjectableResponse, "INSUFFICIENT_DATA").metrics()).containsEntry("projectableCount", 0);
+
+        var sevenProjectableResponse = service(new FakeCashflowMovementHistoryPort()
+                .withProjectable(projectable("sales", 1_000, LocalDate.of(2026, 6, 10)), 7))
+                .generate(PROFILE_ID);
+
+        assertThat(signal(sevenProjectableResponse, "INSUFFICIENT_DATA").description())
+                .isEqualTo("Hay 7 de 10 movimientos listos para proyección. La proyección ya funciona; las recomendaciones serán más robustas al alcanzar el mínimo.");
     }
 
     @Test

@@ -182,9 +182,10 @@ public final class HistoryRecommendationService {
         signals.add(new HistorySignalResponse(
                 "INSUFFICIENT_DATA",
                 "INFO",
-                "Datos insuficientes",
-                "El historial proyectable aún no alcanza el volumen mínimo para señales más robustas.",
-                "Agrega más movimientos para obtener mejores recomendaciones.",
+                "Señal en formación",
+                "Hay %d de %d movimientos listos para proyección. La proyección ya funciona; las recomendaciones serán más robustas al alcanzar el mínimo."
+                        .formatted(projectable.size(), MINIMUM_PROJECTABLE_MOVEMENTS),
+                "Sigue incorporando movimientos reales para fortalecer las señales.",
                 Map.of(
                         "projectableCount", projectable.size(),
                         "minimumProjectableCount", MINIMUM_PROJECTABLE_MOVEMENTS

@@ -2,6 +2,9 @@ package com.kuroneko.pymeflow.application.cashflow;
 
 import com.kuroneko.pymeflow.application.port.out.CashflowMovementHistoryPort;
 import com.kuroneko.pymeflow.application.vertical.VerticalProfileService;
+import com.kuroneko.pymeflow.domain.cashflow.TransactionDirection;
+import com.kuroneko.pymeflow.domain.vertical.CashflowCategory;
+import com.kuroneko.pymeflow.domain.vertical.CashflowDirection;
 import com.kuroneko.pymeflow.domain.vertical.ProfileId;
 
 import java.time.LocalDate;
@@ -73,6 +76,7 @@ public final class CashflowMovementHistoryService {
         if (movement.status() != CashflowMovementStatus.MANUAL_REVIEW) {
             throw new IllegalArgumentException("El movimiento ya fue resuelto o no está disponible para revisión manual.");
         }
+        validateCategoryDirection(category, movement.direction());
 
         var resolved = cashflowMovementHistoryPort.resolveManualReview(command)
                 .orElseThrow(() -> new IllegalArgumentException("El movimiento ya fue resuelto o no está disponible para revisión manual."));
@@ -82,6 +86,19 @@ public final class CashflowMovementHistoryService {
                 resolved.safeDescriptionOptional(),
                 resolved.sourceReferenceOptional()
         );
+    }
+
+    private static void validateCategoryDirection(CashflowCategory category, TransactionDirection movementDirection) {
+        var expectedCategoryDirection = switch (movementDirection) {
+            case CREDIT -> CashflowDirection.INFLOW;
+            case DEBIT -> CashflowDirection.OUTFLOW;
+        };
+        if (category.direction() != expectedCategoryDirection) {
+            throw new IllegalArgumentException(
+                    "La categoría seleccionada no es compatible: su dirección no coincide con la del movimiento bancario "
+                            + "y no puede convertir una entrada en una salida o viceversa."
+            );
+        }
     }
 
     private com.kuroneko.pymeflow.domain.vertical.VerticalProfile requireProfile(ProfileId profileId) {

@@ -123,6 +123,9 @@ public class ApiExceptionHandler {
         if (message.contains("movimiento ya fue resuelto") || message.contains("no está disponible para revisión manual")) {
             return "El movimiento ya fue resuelto o no está disponible para revisión manual.";
         }
+        if (message.contains("categoría seleccionada no es compatible")) {
+            return message;
+        }
         if (message.contains("movimiento rechazado") || message.contains("revisión manual") || message.contains("listo para proyección") || message.contains("estado de salida")) {
             return "Solo se pueden resolver movimientos en revisión manual hacia un resultado listo para proyección.";
         }

@@ -8,7 +8,8 @@ public record ProjectionAlert(
         String actionKey,
         String condition,
         LocalDate date,
-        BigDecimal balance
+        BigDecimal balance,
+        BigDecimal threshold
 ) {
     public ProjectionAlert {
         requireText(ruleKey, "Rule key is required");
@@ -19,6 +20,9 @@ public record ProjectionAlert(
         }
         if (balance == null) {
             throw new IllegalArgumentException("Balance is required");
+        }
+        if (threshold == null) {
+            throw new IllegalArgumentException("Threshold is required");
         }
     }
 

@@ -3,194 +3,204 @@
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>PymeFlow | Cockpit de caja diaria</title>
-    <meta name="description" content="Cockpit estático para revisar caja diaria, abonos, cargos y sincronizaciones fixture/demo de PymeFlow.">
-    <link rel="stylesheet" href="/styles.css">
-    <script src="/app.js" defer></script>
+    <meta name="color-scheme" content="light dark">
+    <title>PymeFlow | Resumen de caja</title>
+    <meta name="description" content="Dashboard estático para revisar caja diaria, abonos, cargos y sincronizaciones fixture/demo de PymeFlow.">
+    <link rel="icon" type="image/png" href="/favicon.png">
+    <link rel="stylesheet" href="/styles.css?v=pymeflow-first-run-3">
+    <script src="/app.js?v=pymeflow-first-run-3" defer></script>
 </head>
 <body>
     <a class="skip-link" href="#contenido">Saltar al contenido principal</a>
 
-    <header class="topbar" aria-label="Identidad del producto">
-        <div>
-            <p class="eyebrow">PymeFlow · MVP cockpit</p>
-            <h1>Caja diaria para PyMEs chilenas</h1>
-            <p class="lead">Una vista operativa para revisar abonos, cargos, cartola y comprobantes de sincronización simulada.</p>
-        </div>
-        <aside class="status-note" aria-label="Alcance de conectividad">
-            <strong>Modo seguro demo</strong>
-            <span>Sincronización fixture/demo. No representa conectividad bancaria real.</span>
-        </aside>
-    </header>
-
-    <nav class="quick-nav" aria-label="Secciones del cockpit">
-        <a href="#caja">Caja</a>
-        <a href="#proyeccion">Proyección</a>
-        <a href="#comprobantes">Comprobantes</a>
-        <a href="#cartola">Cartola</a>
-        <a href="#revision">Revisión</a>
-    </nav>
-
-    <main id="contenido" class="cockpit" tabindex="-1">
-        <section id="demo-guide" class="demo-guide" aria-labelledby="demo-guide-title" aria-label="Guía de demo">
-            <div class="guide-copy">
-                <p class="eyebrow">Demo guiada</p>
-                <h2 id="demo-guide-title">Guía de demo</h2>
-                <p>Recorre el cockpit con datos simulados fixture/demo. Esta guía solo orienta la demo: no bloquea acciones ni representa estado bancario real.</p>
-            </div>
-            <ol class="guide-steps" aria-label="Pasos sugeridos de la demo">
-                <li>
-                    <a href="#demo-reset-btn" data-guide-step="reset" data-guide-target="#demo-reset-btn" aria-current="step">
-                        <span class="guide-step-number">1</span>
-                        <strong>Reiniciar demo</strong>
-                        <span>Vuelve a sembrar evidencia fixture/demo.</span>
-                        <em data-guide-state="reset">Paso actual</em>
-                    </a>
-                </li>
-                <li>
-                    <a href="#revision" data-guide-step="review" data-guide-target="#revision">
-                        <span class="guide-step-number">2</span>
-                        <strong>Revisar pendientes</strong>
-                        <span>Observa movimientos pendientes antes de clasificar.</span>
-                        <em data-guide-state="review">Pendiente</em>
-                    </a>
-                </li>
-                <li>
-                    <a href="#revision" data-guide-step="categorize" data-guide-target="#revision">
-                        <span class="guide-step-number">3</span>
-                        <strong>Categorizar</strong>
-                        <span>Clasifica un movimiento con categorías activas.</span>
-                        <em data-guide-state="categorize">Pendiente</em>
-                    </a>
-                </li>
-                <li>
-                    <a href="#proyeccion" data-guide-step="project" data-guide-target="#proyeccion">
-                        <span class="guide-step-number">4</span>
-                        <strong>Proyectar caja</strong>
-                        <span>Calcula caja con saldo manual ingresado.</span>
-                        <em data-guide-state="project">Pendiente</em>
-                    </a>
-                </li>
-            </ol>
-            <p class="guide-status" role="status" aria-live="polite" data-guide-status-message>No guarda avance: progreso visible solo en esta sesión del navegador.</p>
+    <main id="contenido" class="dashboard-shell" tabindex="-1">
+        <section class="top-composition" data-smoke-region="top-composition" aria-label="Composición superior del dashboard">
+            <header class="topbar" aria-label="Resumen de caja">
+                <div class="topbar-brand-block">
+                    <div class="brand-crop-box" data-smoke-anchor="brand-crop-box">
+                        <img class="brand-lockup brand-lockup--prominent" src="/branding-lockup.png" width="744" height="230" alt="PymeFlow" data-smoke-anchor="brand-logo">
+                    </div>
+                </div>
+                <div class="topbar-title-block">
+                        <h1>RESUMEN DE CAJA</h1>
+                    <p class="lead help-text">Revisa lo pendiente y anticipa los próximos días.</p>
+                </div>
+                <div class="topbar-actions" aria-label="Preferencias del dashboard">
+                    <button id="theme-toggle" class="compact-control theme-toggle" type="button" data-theme-toggle aria-pressed="false" aria-label="Cambiar tema visual">
+                        <span data-theme-toggle-label>Modo claro</span>
+                    </button>
+                </div>
+            </header>
         </section>
 
-        <section id="caja" class="hero-ledger" aria-label="Resumen de caja diaria" data-api-target="cash-summary">
-            <div class="cash-card cash-card--primary" data-summary="balance">
-                <p class="card-label">Caja proyectada de hoy</p>
+        <section id="caja" class="shell-metrics hero-ledger" aria-label="Resumen de caja diaria" data-api-target="cash-summary">
+            <div class="cash-card cash-card--primary" data-summary="balance" data-smoke-anchor="caja-card">
+                <p class="card-label">Flujo neto</p>
                 <p class="amount" data-field="projected-balance">Sin datos</p>
-                <p class="card-copy" data-field="profile-label">Cargando perfil activo y movimientos projection-ready.</p>
+                <p class="card-copy">Entradas − Salidas = Flujo neto</p>
             </div>
 
             <div class="cash-card" data-summary="credit">
-                <p class="card-label">Abonos visibles</p>
+                <p class="card-label">Entradas</p>
                 <p class="amount amount--credit" data-field="credit-total">Sin datos</p>
-                <p class="card-copy">Entradas positivas en CLP con dirección CREDIT.</p>
+                <p class="card-copy">Abonos listos.</p>
             </div>
 
             <div class="cash-card" data-summary="debit">
-                <p class="card-label">Cargos por revisar</p>
+                <p class="card-label">Salidas</p>
                 <p class="amount amount--debit" data-field="debit-total">Sin datos</p>
-                <p class="card-copy">Salidas positivas en CLP con dirección DEBIT.</p>
+                <p class="card-copy">Cargos listos.</p>
             </div>
         </section>
 
-        <section class="actions-panel" aria-label="Acciones principales del cockpit" data-api-target="actions-panel">
-            <div>
-                <p class="eyebrow">Flujo seguro MVP</p>
-                <h2>Revisión antes de proyectar caja</h2>
-                <p>Estas acciones llaman APIs same-origin existentes con datos fixture/demo para evidenciar importación, historial y sync segura.</p>
-            </div>
-            <div class="button-row" aria-label="Acciones de caja">
-                <button type="button" data-action="manual-import">Revisar abonos y cargos con muestra manual</button>
-                <button type="button" class="button-secondary" data-action="provider-sync">Ejecutar sync fixture</button>
-                <button id="demo-reset-btn" type="button" class="button-secondary">Reiniciar demo</button>
-            </div>
-            <p class="state-line" role="status" data-api-target="demo-reset-status" aria-live="polite">Acción segura: solo reinicia datos fixture/demo del cockpit activo.</p>
-        </section>
-
-        <section id="proyeccion" class="projection-panel" aria-label="Proyección de caja por período" data-api-target="projection-panel" tabindex="-1">
-            <div class="projection-copy">
-                <p class="eyebrow">Proyección</p>
-                <h2>Cómo se ve la caja esta semana o este mes</h2>
-                <p>Usa movimientos categorizados y listos para proyección. El saldo inicial es ingresado por el usuario: no viene de una conexión bancaria en vivo.</p>
-            </div>
-            <form class="projection-controls" data-projection-form>
-                <label for="opening-balance">Saldo inicial manual, no bancario</label>
-                <input id="opening-balance" name="openingBalance" type="number" min="0" step="1000" inputmode="numeric" placeholder="Ej: 350000" aria-describedby="opening-balance-help">
-                <p id="opening-balance-help">Monto ingresado por el usuario para simular la caja disponible. No es saldo bancario en vivo ni saldo bancario real.</p>
-                <p class="state-line" role="status" data-api-target="preferences-status" aria-live="polite">Preferencias manuales pendientes de carga.</p>
-
-                <fieldset>
-                    <legend>Período de proyección</legend>
-                    <label><input type="radio" name="horizonDays" value="7" checked> 7 días</label>
-                    <label><input type="radio" name="horizonDays" value="30"> 30 días</label>
-                </fieldset>
-
-                <button type="submit">Calcular proyección</button>
-            </form>
-            <div class="empty-state" role="status" data-api-target="projection-results" aria-live="polite">
-                Categoriza movimientos para proyectar la caja. Luego ingresa un saldo inicial manual y elige 7 o 30 días.
-            </div>
-        </section>
-
-        <div class="workbench">
-            <section id="comprobantes" class="receipt-rail" aria-label="Riel de comprobantes de sincronización">
-                <div class="section-heading">
-                    <p class="eyebrow">Comprobantes</p>
-                    <h2>Sincronización fixture/demo</h2>
-                    <p>Riel tipo boleta para dejar evidencia visible sin exponer datos técnicos sensibles del proveedor.</p>
+        <div class="primary-shell" aria-label="Flujo principal del dashboard">
+            <div class="module-nav-row" aria-label="Acciones de navegación del dashboard">
+                <div class="nav-guide-slot">
+                    <button type="button" class="button-secondary guide-open-btn" data-onboarding-open>Guía</button>
                 </div>
-
-                <article class="receipt" aria-labelledby="sync-title" data-api-target="sync-receipt" aria-live="polite">
-                    <span class="stamp">Demo</span>
-                    <h3 id="sync-title">Sync proveedor simulado</h3>
-                    <div class="state-line" role="status">Sin datos para mostrar. Ejecuta una sync fixture para ver estado durable.</div>
-                </article>
-
-                <article class="receipt receipt--quiet" aria-labelledby="import-title" data-api-target="import-receipt" aria-live="polite">
-                    <span class="stamp stamp--amber">Revisión</span>
-                    <h3 id="import-title">Importación manual pendiente</h3>
-                    <div class="state-line" role="status">Sin datos para mostrar. Importa la muestra para ver aceptados, revisión, rechazados e inválidos.</div>
-                </article>
-            </section>
-
-            <section id="cartola" class="ledger-panel" aria-label="Cartola de movimientos">
-                <div class="section-heading">
-                    <p class="eyebrow">Cartola</p>
-                    <h2>Cartola de movimientos</h2>
-                    <p>Filas estáticas para validar dirección de movimiento, monto CLP positivo e historia de caja.</p>
+                <nav class="module-tabs quick-nav" role="tablist" aria-label="Módulos del dashboard">
+                    <button id="tab-revision" type="button" role="tab" aria-selected="true" aria-controls="revision">Revisión</button>
+                    <button id="tab-proyeccion" type="button" role="tab" aria-selected="false" aria-controls="proyeccion" aria-disabled="true" disabled tabindex="-1">Proyección</button>
+                    <button id="tab-cartola" type="button" role="tab" aria-selected="false" aria-controls="cartola" tabindex="-1">Cartola</button>
+                    <button id="tab-comprobantes" type="button" role="tab" aria-selected="false" aria-controls="comprobantes" tabindex="-1">Comprobantes</button>
+                </nav>
+                <div class="nav-actions nav-reset-slot">
+                    <button id="demo-reset-btn" type="button" data-demo-highlight-step="reset" data-demo-highlight="current">Reiniciar demo</button>
+                    <p class="demo-reset-error" role="alert" hidden data-api-target="demo-reset-error"></p>
                 </div>
+            </div>
 
-                <div class="ledger-list" role="list" aria-label="Movimientos de caja" data-api-target="ledger-list" aria-live="polite">
-                    <div class="empty-state" role="status">Cargando historial projection-ready y revisión manual.</div>
-                </div>
-            </section>
+            <div class="module-workspace">
+                <section id="revision" class="module-panel shell-review review-panel" role="tabpanel" aria-labelledby="tab-revision" tabindex="-1">
+                    <div class="review-content-grid review-grid">
+                        <section class="review-column review-column--movements" aria-label="Movimientos pendientes de revisión manual">
+                            <h3>Movimientos pendientes de revisión</h3>
+                            <p class="review-gate-status" role="status" aria-live="polite" aria-atomic="true" tabindex="-1" data-api-target="review-status"></p>
+                            <div class="empty-state" role="status" data-api-target="manual-review-list" aria-live="polite" tabindex="-1">
+                                Cargando movimientos pendientes de revisión.
+                            </div>
+                        </section>
+                        <section class="review-column review-column--recommendations" aria-label="Recomendaciones de caja">
+                            <h3>Recomendaciones</h3>
+                            <div class="empty-state" role="status" data-api-target="recommendation-list" aria-live="polite">
+                                Cargando recomendaciones.
+                            </div>
+                        </section>
+                    </div>
+                </section>
+
+                <section id="proyeccion" class="module-panel shell-projection projection-panel" role="tabpanel" aria-labelledby="tab-proyeccion" tabindex="-1" hidden aria-label="Proyección de caja por período" data-api-target="projection-panel">
+                    <div class="projection-copy">
+                        <p class="eyebrow">Proyección</p>
+                        <h2>Proyección</h2>
+                    <p class="help-text">El saldo inicial es el supuesto de partida; el cierre proyectado es la estimación resultante.</p>
+                    </div>
+                    <div class="projection-top-grid">
+                        <form class="projection-controls" data-projection-form>
+                            <label for="opening-balance">Saldo inicial (supuesto de partida)</label>
+                            <input id="opening-balance" name="openingBalance" type="number" min="0" step="1000" inputmode="numeric" placeholder="Ej: 350000" aria-describedby="opening-balance-help">
+                            <p id="opening-balance-help" class="help-text">Supuesto de partida para estimar el período; no representa saldo bancario.</p>
+                            <p class="state-line status-text" role="status" data-api-target="preferences-status" aria-live="polite">Preferencias manuales pendientes.</p>
+
+                            <fieldset>
+                                <legend>Período de proyección</legend>
+                                <label><input type="radio" name="horizonDays" value="7" checked> 7 días</label>
+                                <label><input type="radio" name="horizonDays" value="30"> 30 días</label>
+                            </fieldset>
+
+                            <button type="submit" class="control--block" data-demo-highlight-step="project">Calcular proyección</button>
+                        </form>
+                        <div class="empty-state" role="status" data-api-target="projection-results" aria-live="polite">
+                            Categoriza todos los movimientos pendientes para habilitar la proyección.
+                        </div>
+                    </div>
+                </section>
+
+                <section id="cartola" class="module-panel ledger-panel" role="tabpanel" aria-labelledby="tab-cartola" tabindex="-1" hidden aria-label="Cartola de movimientos">
+                    <div class="section-heading">
+                        <p class="eyebrow">Cartola</p>
+                        <h2>Cartola</h2>
+                        <p class="help-text">Movimientos y montos CLP.</p>
+                    </div>
+
+                    <div class="ledger-list" role="list" aria-label="Movimientos de caja" data-api-target="ledger-list" aria-live="polite">
+                        <div class="empty-state" role="status">Cargando historial projection-ready y revisión manual.</div>
+                    </div>
+                </section>
+
+                <section id="comprobantes" class="module-panel receipt-rail" role="tabpanel" aria-labelledby="tab-comprobantes" tabindex="-1" hidden aria-label="Comprobantes de carga de demostración">
+                    <div class="section-heading">
+                        <h2>Comprobantes</h2>
+                        <p class="help-text">Confirma que los datos de demostración se cargaron correctamente sin exponer información sensible.</p>
+                    </div>
+
+                    <article class="receipt" aria-labelledby="sync-title" data-api-target="sync-receipt" aria-live="polite">
+                        <h3 id="sync-title">Carga de demostración</h3>
+                        <div class="state-line" role="status">Aún no hay una carga registrada. Reinicia la demo para ver la evidencia.</div>
+                    </article>
+                </section>
+            </div>
         </div>
 
-        <section id="revision" class="review-panel" aria-label="Revisión manual y estados seguros" tabindex="-1">
-            <div>
-                <p class="eyebrow">Revisión</p>
-                <h2>Movimientos pendientes de revisión</h2>
-                <p>Selecciona una categoría activa para clasificar cada movimiento sin mezclar la dirección bancaria DEBIT/CREDIT con la clasificación INFLOW/OUTFLOW.</p>
+        <section id="onboarding-guide" class="onboarding-guide" role="dialog" aria-modal="true" aria-labelledby="onboarding-guide-title" hidden data-onboarding-guide data-smoke-region="onboarding-guide">
+            <div class="onboarding-card">
+                <button type="button" class="onboarding-close" aria-label="Cerrar guía" data-onboarding-close>×</button>
+                <p class="eyebrow">Guía inicial</p>
+                <p class="onboarding-progress" aria-live="polite" data-onboarding-progress>Bienvenida</p>
+                <h2 id="onboarding-guide-title">Guía de caja PymeFlow</h2>
+                <p class="help-text">Un recorrido breve para entender cómo leer la caja con datos de ejemplo.</p>
+                <ol class="onboarding-steps" aria-label="Pasos iniciales del dashboard">
+                    <li data-onboarding-step="welcome" data-onboarding-step-panel><strong>Bienvenida</strong><span>PymeFlow ayuda a dueños y equipos de pequeñas empresas a ver su caja con más claridad: qué entró, qué salió y qué podría pasar en los próximos días. Esta demo usa datos de ejemplo para que puedas evaluar el flujo sin conectar cuentas reales.</span></li>
+                    <li data-onboarding-step="reset" data-onboarding-step-panel hidden><strong>Preparar la demo</strong><span>Usa Reiniciar demo para volver al escenario de ejemplo y partir desde una base conocida antes de revisar movimientos.</span></li>
+                    <li data-onboarding-step="review" data-onboarding-step-panel hidden><strong>Revisar y categorizar</strong><span>Revisa los movimientos pendientes, confirma de qué se trata cada uno y asigna una categoría para que la información quede lista para proyectar caja.</span></li>
+                    <li data-onboarding-step="projection" data-onboarding-step-panel hidden><strong>Proyección</strong><span>Los movimientos categorizados alimentan una estimación de corto plazo. Puedes probar distintos saldos iniciales y horizontes de días para ver cómo cambia la caja esperada.</span></li>
+                    <li data-onboarding-step="next" data-onboarding-step-panel hidden><strong>Próximas funcionalidades</strong><span>PymeFlow evolucionará con conexiones reales a proveedores financieros, más detalle por movimiento y flujos de revisión para equipos que necesitan validar la caja antes de tomar decisiones.</span></li>
+                </ol>
+                <div class="onboarding-controls" aria-label="Controles de la guía">
+                    <button type="button" class="button-secondary" data-onboarding-prev>Anterior</button>
+                    <button type="button" data-onboarding-next>Siguiente</button>
+                </div>
             </div>
-            <div class="review-grid">
-                <section class="review-column" aria-label="Movimientos pendientes de revisión manual">
-                    <h3>Movimientos pendientes de revisión</h3>
-                    <p class="review-help">Selecciona una categoría y usa “Categorizar movimiento” para dejarlo listo para proyección. Sin movimientos pendientes de revisión se mostrará un estado seguro.</p>
-                    <div class="empty-state" role="status" data-api-target="manual-review-list" aria-live="polite">
-                        Cargando movimientos pendientes de revisión.
+        </section>
+        <section id="category-dialog" class="category-dialog" role="dialog" aria-modal="true" aria-labelledby="category-dialog-title" hidden data-category-dialog>
+            <div class="category-dialog__panel">
+                <div class="category-dialog__header">
+                    <div>
+                        <h2 id="category-dialog-title">Categoriza el movimiento</h2>
+                        <p class="help-text" data-category-dialog-helper>La categoría clasifica el movimiento; no cambia si es entrada o salida.</p>
                     </div>
-                </section>
-                <section class="review-column" aria-label="Recomendaciones de caja">
-                    <h3>Recomendaciones</h3>
-                    <p class="review-help">Evidencia separada: las recomendaciones no reemplazan la cola de revisión manual.</p>
-                    <div class="empty-state" role="status" data-api-target="recommendation-list" aria-live="polite">
-                        Cargando recomendaciones.
+                    <button type="button" class="category-dialog__close" aria-label="Cerrar selector de categoría" data-category-dialog-close>×</button>
+                </div>
+                <div class="category-dialog__body">
+                    <div class="category-dialog__options" data-category-dialog-options></div>
+                </div>
+                <div class="category-dialog__footer">
+                    <p class="help-text" role="status" aria-live="polite" data-category-dialog-status></p>
+                    <button type="button" class="control--block" data-category-dialog-confirm disabled>Aplicar categoría</button>
+                </div>
+            </div>
+        </section>
+        <section id="projection-details-dialog" class="category-dialog projection-details-dialog" role="dialog" aria-modal="true" aria-labelledby="projection-details-title" hidden data-projection-details-dialog>
+            <div class="category-dialog__panel projection-details-dialog__panel">
+                <div class="category-dialog__header">
+                    <div>
+                        <p class="eyebrow">Detalle completo</p>
+                        <h2 id="projection-details-title" data-projection-details-title>Detalle de proyección</h2>
+                        <p class="help-text" data-projection-details-description>Detalle completo del módulo seleccionado.</p>
                     </div>
-                </section>
+                    <button type="button" class="category-dialog__close" aria-label="Cerrar detalle" data-projection-details-close>×</button>
+                </div>
+                <div class="category-dialog__body">
+                    <div class="projection-details-dialog__content" data-projection-details-content></div>
+                </div>
             </div>
         </section>
     </main>
+    <div class="demo-reset-success-overlay" role="status" aria-live="polite" aria-atomic="true" data-demo-reset-success hidden>
+        <div class="demo-reset-success-surface">
+            <strong>Demo reiniciada</strong>
+            <span>Caja actualizada con movimientos listos.</span>
+        </div>
+    </div>
 </body>
 </html>

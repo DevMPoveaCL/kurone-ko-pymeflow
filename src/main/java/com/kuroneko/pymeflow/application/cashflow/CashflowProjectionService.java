@@ -129,7 +129,8 @@ public final class CashflowProjectionService {
                         rule.actionKey(),
                         rule.condition(),
                         balance.date(),
-                        balance.balance()
+                        balance.balance(),
+                        rule.threshold()
                 ))
                 .toList();
     }
