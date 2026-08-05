@@ -3,18 +3,36 @@ services:
     image: postgres:16-alpine
     container_name: pymeflow-postgres
     environment:
-      POSTGRES_DB: pymeflow
-      POSTGRES_USER: pymeflow
-      POSTGRES_PASSWORD: pymeflow_local
+      POSTGRES_DB: ${POSTGRES_DB:-pymeflow}
+      POSTGRES_USER: ${POSTGRES_USER:-pymeflow}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-pymeflow_local}
     ports:
       - "5432:5432"
     volumes:
       - postgres-data:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U pymeflow -d pymeflow"]
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
       interval: 10s
       timeout: 5s
-      retries: 5
+      retries: 10
+
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: pymeflow-app
+    environment:
+      PYMEFLOW_DATASOURCE_URL: jdbc:postgresql://postgres:5432/${POSTGRES_DB:-pymeflow}
+      PYMEFLOW_DATASOURCE_USERNAME: ${POSTGRES_USER:-pymeflow}
+      PYMEFLOW_DATASOURCE_PASSWORD: ${POSTGRES_PASSWORD:-pymeflow_local}
+      PYMEFLOW_ACTIVE_PROFILE: ${PYMEFLOW_ACTIVE_PROFILE:-pharmacy-cl}
+      PYMEFLOW_MOCK_BANK_SETTLEMENTS: ${PYMEFLOW_MOCK_BANK_SETTLEMENTS:-false}
+      PYMEFLOW_MOCK_ACQUIRER_SETTLEMENTS: ${PYMEFLOW_MOCK_ACQUIRER_SETTLEMENTS:-false}
+    ports:
+      - "8080:8080"
+    depends_on:
+      postgres:
+        condition: service_healthy
 
 volumes:
   postgres-data:
