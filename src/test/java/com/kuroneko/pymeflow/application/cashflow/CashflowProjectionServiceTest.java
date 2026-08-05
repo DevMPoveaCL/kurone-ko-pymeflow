@@ -107,24 +107,30 @@ class CashflowProjectionServiceTest {
     @Test
     void createsAlertsForSupportedProfileRulesAndIgnoresUnknownConditions() {
         var rules = List.of(
-                new ProfileRule("low", "projected_balance_below_threshold", BigDecimal.valueOf(500), "warn-low"),
-                new ProfileRule("high", "projected_balance_above_threshold", BigDecimal.valueOf(900), "mark-healthy"),
+                new ProfileRule("low", "projected_balance_below_threshold", BigDecimal.valueOf(250_000), "warn-low"),
+                new ProfileRule("high", "projected_balance_above_threshold", BigDecimal.valueOf(750_000), "mark-healthy"),
                 new ProfileRule("unknown", "future_condition", BigDecimal.ZERO, "ignore")
         );
         var service = service(profile(rules, List.of()));
 
         var result = service.project(command(
-                BigDecimal.valueOf(600),
+                BigDecimal.valueOf(100_000),
                 LocalDate.of(2026, 1, 1),
                 2,
                 List.of(
-                        transaction("sales", 400, LocalDate.of(2026, 1, 1)),
-                        transaction("suppliers", 700, LocalDate.of(2026, 1, 2))
+                        transaction("sales", 700_000, LocalDate.of(2026, 1, 1)),
+                        transaction("suppliers", 600_000, LocalDate.of(2026, 1, 2))
                 )
         ));
 
         assertThat(result.alerts()).extracting(ProjectionAlert::ruleKey)
                 .containsExactly("high", "low");
+        assertThat(result.alerts()).filteredOn(alert -> alert.ruleKey().equals("high"))
+                .singleElement()
+                .satisfies(alert -> assertThat(alert.threshold()).isEqualByComparingTo("750000"));
+        assertThat(result.alerts()).filteredOn(alert -> alert.ruleKey().equals("low"))
+                .singleElement()
+                .satisfies(alert -> assertThat(alert.threshold()).isEqualByComparingTo("250000"));
     }
 
     @Test

@@ -48,3 +48,9 @@ Chain strategy: stacked-to-main
 - [x] 4.1 Add RED tests for hidden/demoted tutorial treatment, bounded desktop shell, compact mobile shell ordering, internal evidence scrolling, and no horizontal-overflow patterns.
 - [x] 4.2 Implement final viewport hardening in `styles.css` without touching backend/API contracts.
 - [x] 4.3 Run focused static verification and preserve desktop/mobile smoke evidence before verify handoff.
+
+## Phase 5: PR2 Corrective Modal/Shell/Guide Polish
+
+- [x] 5.1 Add RED-first static contracts for bounded category modal panels, shared shell width/gutters, in-block nav ordering, five-step guide copy, and no visible useless action buttons.
+- [x] 5.2 Update `index.html`, `styles.css`, and `app.js` so category options scroll inside the panel, topbar/KPI/nav/content share one container system, Guía/tabs/Reiniciar demo live in one nav block, and the guide works as a five-step onboarding wizard.
+- [x] 5.3 Run focused `CockpitStaticResourceTest` and cockpit-pattern verification commands.
