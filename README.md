@@ -4,7 +4,7 @@ PymeFlow helps a Chilean small business turn a scattered view of deposits, charg
 
 This MVP demonstrates that workflow with a pharmacy-oriented Chilean demo profile, simulated provider data, and PostgreSQL persistence. It is designed for local evaluation and demos, not production financial operations.
 
-![Light PymeFlow dashboard showing the guided demo, cash summary, projection controls, receipt evidence, statement movements, and pending review queue](docs/images/pymeflow-dashboard-light.png)
+![Current PymeFlow dashboard showing the cash summary, review queue, recommendations, and primary navigation](docs/images/pymeflow-dashboard-current.png)
 
 *The main cockpit keeps the operating sequence visible: review movements first, then project cash from categorized history.*
 
@@ -16,11 +16,15 @@ This MVP demonstrates that workflow with a pharmacy-oriented Chilean demo profil
 4. **Calculate a seven- or 30-day projection.** Enter a manual opening balance and use categorized movements to explore the expected closing cash position.
 5. **Inspect the cartola and evidence.** The statement view preserves movement context, while the receipts area makes the simulated sync and manual-import evidence visible.
 
-![Dark PymeFlow projection view with a manual opening balance, seven- and 30-day choices, projected closing cash, obligations, and alerts](docs/images/pymeflow-projection-dark.png)
+![Current PymeFlow category dialog showing only categories compatible with an outgoing movement](docs/images/pymeflow-category-current.png)
+
+*The category dialog protects the movement direction: an outgoing movement only offers outgoing categories.*
+
+![Current PymeFlow projection view with a manual opening balance, 30-day horizon, projected closing cash, obligations, and alerts](docs/images/pymeflow-projection-current.png)
 
 *The projection is a decision-support view: its opening balance is manual and does not represent a live bank balance.*
 
-![Mobile dark PymeFlow cockpit showing the guided workflow, projection controls, evidence cards, statement movements, and review queue in a single responsive column](docs/images/pymeflow-mobile-dark.png)
+![Current mobile PymeFlow projection view at 390 by 844 pixels](docs/images/pymeflow-mobile-current.png)
 
 *The same review trail remains available on a narrow screen when a cash check has to happen away from a desk.*
 
@@ -142,6 +146,10 @@ src/test/          Unit, architecture, web, persistence, and integration tests
 - Development PostgreSQL credentials are intentionally public and must not be reused outside local development.
 - Forecasts are decision-support demonstrations, not accounting, tax, or financial advice.
 
-### Author And License
+### Author and rights
 
-Created by [DevMPoveaCL](https://github.com/DevMPoveaCL). No license is granted; all rights are reserved unless the repository owner adds an explicit license.
+**Author:** DevMPoveaCL
+
+See [LICENSE](LICENSE).
+
+© DevMPoveaCL. All rights reserved. This project is shared as a portfolio/MVP preview and is not licensed for reuse, redistribution, or commercial use without permission.
