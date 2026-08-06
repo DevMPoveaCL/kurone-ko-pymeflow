@@ -47,6 +47,10 @@ docker compose up --build
 
 Open [PymeFlow](http://localhost:8080). The application waits for PostgreSQL to become healthy; its Docker health endpoint is [http://localhost:8080/actuator/health](http://localhost:8080/actuator/health).
 
+## Roadmap
+
+The [PymeFlow roadmap](ROADMAP.md) describes the ordered path from the current cashflow MVP to trustworthy, explainable financial decision support. The next focus is deterministic scenario foundations for comparing a cash baseline with a loan or other financing scenario; no chat or LLM integration is planned in that first slice.
+
 ## Reference
 
 ### Demo Reset
