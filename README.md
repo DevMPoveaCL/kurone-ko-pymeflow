@@ -1,6 +1,6 @@
 # PymeFlow MVP
 
-PymeFlow helps a Chilean small business turn a scattered view of deposits, charges, and supporting records into one daily cash-flow decision. Instead of treating an incoming bank movement as immediately usable cash, the cockpit separates review, categorization, and projection so the owner can see what is ready, what needs attention, and what the next week or month may look like.
+PymeFlow brings a small business's daily cash information into one place. The cockpit shows money coming in, money going out, movements that still need review, and an estimate of how cash could evolve over the next week or month.
 
 This MVP demonstrates that workflow with a pharmacy-oriented Chilean demo profile, simulated provider data, and PostgreSQL persistence. It is designed for local evaluation and demos, not production financial operations.
 
@@ -10,15 +10,15 @@ This MVP demonstrates that workflow with a pharmacy-oriented Chilean demo profil
 
 ## The Journey
 
-1. **Start or reset the demo.** Seed the `pharmacy-cl` example to work from a known set of simulated movements. The reset replaces that profile's demo data; never use it with non-demo data.
-2. **Review movements.** Read the pending queue before treating incoming or outgoing amounts as projection-ready.
-3. **Categorize compatible inflows and outflows.** Assign one active category to each movement. Bank direction (`CREDIT` or `DEBIT`) remains distinct from the business flow classification (`INFLOW` or `OUTFLOW`).
-4. **Calculate a seven- or 30-day projection.** Enter a manual opening balance and use categorized movements to explore the expected closing cash position.
-5. **Inspect the cartola and evidence.** The statement view preserves movement context, while the receipts area makes the simulated sync and manual-import evidence visible.
+1. **Start with the demo.** Use **Reiniciar demo** to restore a known set of example movements.
+2. **Review what needs attention.** **Revisión** separates pending movements from those already included in the cash summary.
+3. **Categorize each pending movement.** PymeFlow only offers categories that match whether the movement is an **Entrada** or **Salida**. Once every pending movement is categorized, **Proyección** becomes available.
+4. **Estimate the next seven or 30 days.** Enter a starting balance, choose the period, and select **Calcular proyección** to see the estimated closing balance, totals, obligations, and alerts.
+5. **Inspect the supporting information.** **Cartola** shows the movement history, while **Comprobantes** exposes the evidence produced by the simulated demo operations.
 
-![Current PymeFlow category dialog showing only categories compatible with an outgoing movement](docs/images/pymeflow-category-current.png)
+![Current PymeFlow category dialog showing the available categories for a Salida](docs/images/pymeflow-category-current.png)
 
-*The category dialog protects the movement direction: an outgoing movement only offers outgoing categories.*
+*A movement marked as **Salida** only offers categories that belong to **Salidas**.*
 
 ![Current PymeFlow projection view with a manual opening balance, 30-day horizon, projected closing cash, obligations, and alerts](docs/images/pymeflow-projection-current.png)
 
@@ -26,13 +26,13 @@ This MVP demonstrates that workflow with a pharmacy-oriented Chilean demo profil
 
 ![Current mobile PymeFlow projection view at 390 by 844 pixels](docs/images/pymeflow-mobile-current.png)
 
-*The same review trail remains available on a narrow screen when a cash check has to happen away from a desk.*
+*The projection controls remain readable and usable on a narrow screen when a cash check has to happen away from a desk.*
 
 ## What You Can Evaluate
 
-- Whether the workflow makes the distinction between a bank movement and a cash-flow category understandable.
-- Whether the guided review queue produces enough evidence before a movement enters a projection.
-- Whether seven- and 30-day projections, alerts, obligations, cartola, and receipts support a practical daily cash conversation.
+- Whether **Flujo neto**, **Entradas**, and **Salidas** make the current cash position easy to understand.
+- Whether pending movements can be reviewed and categorized clearly as **Entradas** or **Salidas**.
+- Whether seven- and 30-day projections, alerts, obligations, **Cartola**, and **Comprobantes** support a practical daily cash conversation.
 - Whether the desktop and responsive mobile cockpit are clear enough for a small-business operator.
 
 ## Quick Start
